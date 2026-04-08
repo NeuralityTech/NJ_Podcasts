@@ -67,3 +67,32 @@ def extract_pages(input_pdf, output_pdf, requested_labels):
         raise e
         
     return output_pdf
+
+def get_pdf_page_index(original_page_label):
+    """
+    Maps an original page label (e.g., '5') to its 1-based index in custom_pages.pdf.
+    Uses custom_pages_labels.json sidecar file.
+    """
+    try:
+        # Resolve path to the labels file
+        root_dir = os.getcwd()
+        labels_path = os.path.join(root_dir, "output", "custom_pages_labels.json")
+        
+        if not os.path.exists(labels_path):
+            return original_page_label # Fallback
+            
+        with open(labels_path, 'r', encoding='utf-8') as f:
+            labels = json.load(f)
+            
+        # labels is a list of strings like ["1", "2", "5", "8"]
+        label_str = str(original_page_label).strip()
+        if label_str.lower().startswith("page "):
+            label_str = label_str[5:].strip()
+            
+        if label_str in labels:
+            # 1-based index
+            return str(labels.index(label_str) + 1)
+            
+        return original_page_label # Fallback
+    except:
+        return original_page_label

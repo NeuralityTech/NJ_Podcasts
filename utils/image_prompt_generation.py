@@ -3,6 +3,7 @@ import json
 import re
 from google import genai
 from google.genai import types
+from utils.pdf_handler import get_pdf_page_index
 
 def generate_prompt_audit_html(prompts_data, output_folder):
     """
@@ -29,17 +30,22 @@ def generate_prompt_audit_html(prompts_data, output_folder):
             v, p, url = "?", "?", "#"
             if isinstance(tr, dict):
                 v = tr.get("value", "")
-                p = tr.get("page", "")
-                num_match = re.findall(r'\d+', str(p))
-                num = num_match[0] if num_match else "1"
-                # Exact absolute file link with page anchor
-                url = f"{pdf_base_url}#page={num}"
+                p_raw = tr.get("page", "")
+                p = str(p_raw).strip()
+                if p.lower().startswith("page "):
+                    p = p[5:].strip()
+                
+                # RECALIBRATION: Map original page label to physical index in custom_pages.pdf
+                physical_idx = get_pdf_page_index(p)
+                
+                # Exact absolute file link with page anchor (added view=FitH for better browser compatibility)
+                url = f"{pdf_base_url}#page={physical_idx}&view=FitH,0"
             
             trace_html += f'''
 <div style="margin-top: 15px; font-size: 14px; padding: 12px; background: #f0f7ff; border-radius: 8px; border-left: 5px solid #004C8F;">
   <div style="font-weight: 800; color: #d35400; margin-bottom: 5px;">→ DATA TRACE: {v} | Source: {p}</div>
   <a href="{url}" target="_blank" class="audit-link" style="display: inline-block; background: #ffeb3b; color: #000; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-weight: bold; border: 1px solid #c0ca33;">
-    OPEN SOURCE PDF (Jump to Page {num})
+    OPEN SOURCE PDF (Jump to Page {physical_idx})
   </a>
 </div>'''
 

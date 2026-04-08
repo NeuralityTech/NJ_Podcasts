@@ -3,6 +3,7 @@ import json
 import re
 from google import genai # USING THE LATEST SDK (google-genai)
 from google.genai import types
+from utils.pdf_handler import get_pdf_page_index
 
 from utils.models_config import ACTIVE_TEXT_MODEL, get_gemini_client
 
@@ -170,18 +171,24 @@ def process_retrieval_extraction(latest_output_folder, questions, api_key):
             
             ref_html = ""
             for ref in refs:
-                p_label = ref.get("page", "Page 1")
-                num_match = re.findall(r'\d+', str(p_label))
-                num = num_match[0] if num_match else "1"
+                p_label_raw = ref.get("page", "1")
+                # Clean "Page Page 5" duplication
+                p_label = str(p_label_raw).strip()
+                if p_label.lower().startswith("page "):
+                     p_label = p_label[5:].strip()
+                
                 snip = ref.get("snippet", "")
                 
+                # RECALIBRATION: Map original page label to physical index in custom_pages.pdf
+                physical_idx = get_pdf_page_index(p_label)
+                
                 snip_escaped = str(snip).replace('<', '&lt;').replace('>', '&gt;')
-                # ENHANCED: Absolute URI with mandatory page anchor and search parameter for highlighting (if browser supports)
-                full_pdf_link = f"{pdf_base_url}#page={num}"
+                # ENHANCED: Absolute URI with mandatory page anchor (added view=FitH for better browser compatibility)
+                full_pdf_link = f"{pdf_base_url}#page={physical_idx}&view=FitH,0"
                 ref_html += f'''
   <div class="reference" style="border-bottom: 2px solid #3498db; margin-bottom: 15px; padding-bottom: 5px;">
     <span style="font-weight: bold; font-size: 16px; color: #d35400;">→ GROUND TRUTH SOURCE: Page {p_label}</span> |
-    <a class="link" href="{full_pdf_link}" target="_blank" style="font-weight: bold; background: #ffeb3b; padding: 2px 6px; border-radius: 4px; text-decoration: none; color: #000;">OPEN SOURCE PDF (Jump to Page {num})</a>
+    <a class="link" href="{full_pdf_link}" target="_blank" style="font-weight: bold; background: #ffeb3b; padding: 2px 6px; border-radius: 4px; text-decoration: none; color: #000;">OPEN SOURCE PDF (Jump to Page {physical_idx})</a>
     <div class="snippet" style="margin-top: 10px; border: 1px dashed #7f8c8d; padding: 10px; background: white; white-space: pre-wrap;">{snip_escaped}</div>
   </div>'''
 
