@@ -1,0 +1,221 @@
+TAB 1: PDF UPLOAD + BRAND EXTRACTION MODULE
+
+You are building TAB 1 of a PyQt-based PDF processing application.
+
+This tab is responsible for:
+1. Uploading a PDF file
+2. Storing it locally
+3. Running BRAND EXTRACTION ON DEMAND
+
+
+- UI COMPONENTS (MANDATORY)
+
+
+Create a TAB 1 interface with TWO buttons:
+
+
+-- BUTTON 1: "Upload PDF"
+
+
+FUNCTION:
+- Opens file dialog to select PDF
+
+BEHAVIOR:
+- Copy selected PDF into:
+
+E:\mineru_new\input\
+
+- Store full path in:
+
+self.uploaded_pdf_path
+
+DISPLAY:
+- File Name
+- File Path
+- Total Pages (auto-detect)
+
+
+-- BUTTON 2: "Extract Brand Identity"
+
+
+FUNCTION:
+- Runs BRAND EXTRACTION MODULE on uploaded PDF
+
+CONDITION:
+- Must only work AFTER PDF upload
+
+PDF BRAND IDENTITY EXTRACTION ENGINE (STANDALONE MODULE)
+
+You are a high-precision multimodal document intelligence system.
+
+Your ONLY task is to analyze a FULL uploaded PDF and extract BRAND IDENTITY.
+
+This module runs independently and produces a GLOBAL REFERENCE FILE that will be used in all downstream pipeline stages.
+
+IMPORTANT RULE
+
+Analyze the ENTIRE PDF (ALL pages)
+Do not generate scripts, scenes, images, chunking, or QA outputs
+Only extract brand identity assets
+
+INPUT
+
+You will receive the full PDF as:
+
+All pages rendered as images
+Headers and footers across all pages
+Embedded logos and visual elements
+
+OBJECTIVE
+
+Extract and generate:
+
+Primary Logo (most consistent across full PDF)
+Brand Color Palette (2 to 5 dominant colors)
+Secondary Logos (if present)
+Brand Style Classification
+
+STEP 1: LOGO DETECTION (FULL DOCUMENT ANALYSIS)
+
+Identify the most consistent logo across all pages.
+
+First page is a strong signal but not final authority.
+Final decision must be based on repetition across the full PDF.
+
+VALID LOGO RULES
+
+A valid logo must:
+
+Appear repeatedly across multiple pages or consistently in header/footer
+Be visually identical or highly similar across occurrences
+Represent brand identity (text or logo mark)
+
+REJECT
+
+Charts
+Diagrams
+Illustrations
+Decorative icons
+One-time images
+
+FINAL SELECTION RULE
+
+Primary logo equals highest frequency and strongest consistency across the PDF.
+
+STEP 2: LOGO OUTPUT REQUIREMENT
+
+Crop detected logo from PDF and save it as an image file.
+
+Save path:
+output/brand/logo.png
+
+If multiple candidates exist, choose the most frequent and structurally consistent one.
+
+Optionally return bounding box coordinates if available.
+
+STEP 3: BRAND COLOR EXTRACTION
+
+Extract dominant brand colors from:
+
+Logo (highest priority)
+Repeated headers and footers
+UI elements such as buttons and headings
+Charts only if consistent across pages
+
+PROCESS
+
+Convert to LAB color space.
+Apply clustering such as K-means.
+Remove noise including:
+
+White background
+Black text
+Gray shadows
+Merge similar colors using perceptual similarity threshold.
+
+OUTPUT RULE
+
+Return only 2 to 5 dominant colors.
+First color must be the primary brand color.
+
+STEP 4: BRAND STYLE CLASSIFICATION
+
+Classify the document into one category:
+
+Corporate Banking
+Finance
+Technology
+Education
+Healthcare
+Government
+Retail
+Consulting
+General Corporate
+
+Base classification on:
+
+Layout density
+Typography style
+Color usage
+Visual hierarchy
+Document structure
+
+STEP 5: CROSS-PAGE VALIDATION
+
+Before finalizing output:
+
+Logo must appear consistently or be strongly repeated across pages
+Colors must appear in multiple sections
+Avoid single-page artifacts
+Prefer document-wide patterns
+
+If uncertain, reduce confidence instead of guessing.
+
+OUTPUT STORAGE (MANDATORY)
+
+Save results to:
+output/brand/extractor.json
+output/brand/logo.png
+
+FINAL OUTPUT FORMAT (STRICT JSON ONLY)
+
+Return only:
+
+{
+"logo": {
+"logo_path": "output/brand/logo.png",
+"confidence": 0.0,
+"reason": "Selected based on repetition and full PDF consistency"
+},
+"brand_colors": [
+"#RRGGBB",
+"#RRGGBB",
+"#RRGGBB"
+],
+"secondary_logos": [],
+"style": "Corporate Banking",
+"validation": {
+"repetition_score": 0.0,
+"consistency_score": 0.0
+}
+}
+
+CRITICAL RULES
+
+Do not hallucinate logos or colors.
+Do not guess branding.
+Do not use external knowledge.
+Use only visual evidence from the PDF.
+Prioritize repeated elements.
+Always prefer consistency over single-page signals.
+
+FINAL PURPOSE
+
+This output will be used globally in:
+Scene generation
+Script generation
+Image prompt generation
+UI design systems
+Video generation pipeline
+
+Accuracy is critical.

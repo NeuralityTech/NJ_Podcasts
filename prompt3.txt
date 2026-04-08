@@ -1,0 +1,383 @@
+You are an expert Python developer and UI architect.
+
+Build a complete PyQt (PyQt5 or PyQt6) desktop application that implements a 4-stage PDF processing pipeline integrated with a locally installed MinerU system.
+
+CORE PRINCIPLE (CRITICAL)
+
+The system must strictly follow selected page control.
+
+Selected pages must control:
+- PDF extraction
+- MinerU processing input
+- Reconstruction (if used)
+- Chunking output
+
+DO NOT process the full PDF unless explicitly selected.
+
+PROJECT STRUCTURE (MANDATORY)
+
+E:\mineru_new\
+├── env\
+├── input\
+├── output\
+├── mineru_models\
+├── ui_app.py
+├── utils\
+│   ├── pdf_handler.py
+│   ├── mineru_runner.py
+│   ├── chunking.py
+
+GLOBAL STATE MANAGEMENT
+
+Maintain:
+
+self.uploaded_pdf_path        → original PDF  
+self.custom_pdf_path          → selected pages PDF  
+self.latest_output_folder     → MinerU output folder  
+self.selected_pages           → list of selected page numbers  
+
+These must be shared across ALL tabs.
+
+TAB 1: PDF UPLOAD
+
+Features:
+- Upload PDF button
+- Show:
+  - File name
+  - File path
+  - Total pages
+
+Behavior:
+- Copy PDF into:
+
+E:\mineru_new\input\
+
+- Store path in:
+  self.uploaded_pdf_path
+
+TAB 2: CUSTOM PAGE SELECTION
+
+Features:
+- Input field supporting:
+  - Single pages → 5, 10
+  - Ranges → 1-5
+  - Multiple ranges → 1-5, 8-10, 15, 20-25
+
+- Button: "Generate Custom PDF"
+
+Parsing Rules:
+- Split by comma
+- Handle ranges and single values
+- Remove duplicates
+- Sort pages
+- Validate page limits
+
+Store result in:
+self.selected_pages
+
+Behavior:
+- Extract ONLY selected pages from original PDF
+- DO NOT extract full PDF
+
+Save in:
+
+E:\mineru_new\output\custom_pages.pdf
+
+Store:
+self.custom_pdf_path
+
+TAB 3: MINERU PROCESSING
+
+Features:
+- Button: "Run MinerU"
+
+Behavior:
+- Run MinerU ONLY on:
+
+self.custom_pdf_path
+
+Command:
+
+mineru -p E:\mineru_new\output\custom_pages.pdf -o E:\mineru_new\output -b pipeline -d cpu -l en
+
+After execution:
+- Detect latest output folder dynamically
+- Store in:
+  self.latest_output_folder
+
+Display inside UI:
+- JSON file
+- Markdown file
+- images/
+- tables/ (if exists)
+
+IMPORTANT:
+- Do NOT process original PDF
+- Only process custom PDF
+
+
+
+TAB 4: PREPROCESSING (UNIVERSAL TEXT NORMALIZATION)
+
+Button: "Process Pages"
+
+Input:
+*_middle.json from self.latest_output_folder
+
+STRICT RULE:
+Process ONLY self.selected_pages
+
+--------------------
+PREPROCESSING STEPS
+--------------------
+
+1. PAGE FILTERING
+- Skip pages not in selected_pages
+
+2. TEXT CONSOLIDATION
+- Merge:
+  - paragraph blocks
+  - spans
+  - broken lines
+- Preserve reading order
+- Output must be continuous readable text
+
+3. DROP IMAGES (MANDATORY)
+- Ignore image_blocks
+- Ignore images folder completely
+- Do NOT include images anywhere
+
+4. UNIVERSAL TABLE PROCESSING
+
+APPLY ONLY IF:
+table_cells < 100
+
+GENERAL TABLE-TO-TEXT LOGIC:
+
+Step 1: Extract structure
+- Identify headers (first row or inferred column labels)
+- Identify rows
+
+Step 2: For each row:
+- Map column → value pairs
+- Convert into natural language
+
+Step 3: Sentence generation rules (GENERIC):
+
+- Use pattern:
+  "<Column> is <Value>"
+
+- If multiple columns:
+  Combine with commas and "and"
+
+- If meaningful key exists (like Year, Name, Product):
+  Use it as subject:
+  Example:
+  "In 2023, revenue was 100M."
+  "Product A had sales of 200 and profit of 50."
+
+- If no clear structure:
+  Fallback:
+  "Column1 is Value1, Column2 is Value2."
+
+Step 4: Combine all row sentences into paragraph text
+
+Step 5: Append to page text
+
+IMPORTANT:
+- Must work for ANY table structure
+- Must not depend on fixed column names
+- Must produce readable sentences
+
+LARGE TABLES (cells ≥ 100):
+- COMPLETELY IGNORE
+
+5. MERGE TABLE TEXT
+- Append generated table text into main page text
+
+6. TEXT CLEANING
+- Remove extra spaces
+- Normalize punctuation
+- Ensure readability
+- Remove noise
+
+7. TOKEN COUNT (UI ONLY)
+
+- Count tokens per page
+- Store per-page tokens
+
+- Compute total tokens:
+  self.total_tokens = sum(page["tokens"] for page in cleaned_pages_data)
+
+Display in UI:
+
+Page 3 → 32 tokens
+Page 5 → 28 tokens
+
+-------------------------
+TOTAL TOKENS → 60
+
+IMPORTANT:
+- Token count is ONLY for UI
+- No chunking in this stage
+
+--------------------
+
+PREPROCESSING OUTPUT
+
+self.cleaned_pages_data = [
+{
+  "page": 3,
+  "text": "...clean structured text...",
+  "tokens": 245
+}
+]
+
+
+
+TAB 5: CHUNKING (FINAL RAG STAGE)
+
+Button: "Generate Chunks"
+
+Input:
+self.cleaned_pages_data
+
+STRICT RULE:
+Use ONLY preprocessed text (no JSON, no images, no tables)
+
+
+CHUNKING STRATEGY
+
+
+1. PAGE-LEVEL SEGMENTATION
+- Process each page independently
+- Preserve page number
+
+2. SENTENCE SPLITTING
+- Split text into sentences
+
+3. CONTEXT-BASED GROUPING (CORE LOGIC)
+- Group sentences into meaningful chunks
+- Start new chunk when:
+  - topic changes
+  - contrast words appear (however, but, etc.)
+  - semantic shift occurs
+
+4. CHUNK SIZE RULES
+- 2–5 sentences per chunk
+- Ideal: 300–400 tokens
+- Max: 500 tokens
+
+If too large:
+→ split at sentence boundary
+
+If too small:
+→ merge with adjacent chunk
+
+5. SLIDING WINDOW (MANDATORY)
+- Overlap last sentence with next chunk
+
+Example:
+Chunk 1 → S1 S2 S3
+Chunk 2 → S3 S4 S5
+
+6. STRICT PAGE CONTROL
+- Only use self.cleaned_pages_data
+- Do NOT access other pages
+
+
+
+FINAL OUTPUT FORMAT
+
+[
+{
+  "section": "General",
+  "type": "text",
+  "content": "Revenue increased by 20% in 2024...",
+  "page": 3
+}
+]
+
+RULES:
+- ONLY TEXT chunks
+- NO tables
+- NO images
+- NO references
+- Clean, readable, standalone content
+
+
+
+OUTPUT LOCATION (STRICT)
+
+Save ONLY to:
+
+E:\mineru_new\output\<latest_output_folder>\chunks.json
+
+DO NOT:
+- Create new folders
+- Duplicate MinerU outputs
+- Save outside this folder
+
+
+
+THREADING & PERFORMANCE
+
+Use QThread for:
+- MinerU execution
+- Preprocessing
+
+UI must remain responsive
+
+Show status:
+- Running...
+- Completed
+- Failed
+
+
+
+ERROR HANDLING
+
+Handle:
+- No PDF uploaded
+- No pages selected
+- Invalid page range
+- custom_pages.pdf missing
+- MinerU failure
+- JSON not found
+
+
+
+FINAL WORKFLOW
+
+1. Upload PDF → input/
+2. Select pages → custom_pages.pdf
+3. MinerU runs ONLY on selected pages
+4. Preprocessing:
+   - consolidate text
+   - drop images
+   - convert small tables
+   - ignore large tables
+   - clean text
+   - count tokens (UI only)
+5. Chunking:
+   - sentence-based
+   - context grouping
+   - token control
+   - sliding window
+6. Save chunks.json in MinerU output folder
+
+
+
+FINAL CONSTRAINTS
+
+Do NOT:
+- Process full PDF unless selected
+- Include images anywhere
+- Include large tables
+- Break sentence meaning
+- Create noisy or oversized chunks
+
+Ensure:
+- Clean text-only output
+- High semantic coherence
+- Strong RAG performance

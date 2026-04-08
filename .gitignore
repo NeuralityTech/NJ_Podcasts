@@ -1,0 +1,28 @@
+# Python / Environment
+__pycache__/
+*.pyc
+env/
+venv/
+.env
+.ipynb_checkpoints/
+
+# CREDENTIALS (CRITICAL: DO NOT PUSH)
+gen-lang-client-*.json
+*.json
+!requirements*.txt
+!models_list.txt
+!image_prompts.json (only if needed, but safer to block all json by default)
+
+# PROJECT DATA (LOCALLY GENERATED)
+output/
+project/
+input/
+MinerU/
+mineru_models/
+reference-pic/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,197 @@
+You are an expert Python developer specializing in PyQt (PyQt5 or PyQt6), local AI pipelines, and MinerU integration.
+
+Build a complete desktop application using PyQt for an end-to-end PDF processing system using a locally installed MinerU setup.
+
+PROJECT FOLDER STRUCTURE (MUST FOLLOW)
+
+
+E:\mineru_new\
+│
+├── env\                (Python virtual environment)
+├── input\              (User uploaded PDFs will be copied here)
+├── Mineru\             (Optional project scripts / UI code)
+├── mineru_models\      (Downloaded MinerU models)
+├── output\             (MinerU generated outputs)
+├── ui_app.py           (Main PyQt application)
+└── reconstruct_pages.py
+
+IMPORTANT:
+MinerU is already installed locally inside the environment.
+The UI must call MinerU via command line using subprocess.
+
+APPLICATION REQUIREMENTS
+
+Use PyQt with QTabWidget (tab-based UI)
+
+TAB 1: Upload & MinerU Execution
+
+Provide button: "Upload PDF"
+
+On click:
+- Open file dialog
+- Copy selected PDF into:
+  E:\mineru_new\input\
+
+Display file name
+
+Provide button: "Run MinerU"
+
+On click:
+- Activate local environment (implicitly assumed)
+- Execute command:
+
+mineru -p E:\mineru_new\input\<file>.pdf -o E:\mineru_new\output -b pipeline -d cpu -l en
+
+If OpenMP error occurs:
+Set environment variable:
+KMP_DUPLICATE_LIB_OK=TRUE
+
+After execution:
+- Automatically detect latest folder inside:
+  E:\mineru_new\output\
+
+- Dynamically locate:
+  *_middle.json  
+  *_layout.json  
+  tables/  
+  images/  
+  formulas/  
+
+- Display all detected files in UI
+
+TAB 2: Page Parsing & PDF Export
+
+Provide dropdown:
+All Pages  
+First N Pages  
+Custom Range  
+
+Custom Range Input must support:
+30-60, 80-90, 78-90, 5, 10-15  
+
+Logic:
+- Parse ranges
+- Remove duplicates
+- Sort pages
+- Validate page numbers
+
+Provide button: "Extract Selected Pages"
+
+On click:
+- Read original PDF from input folder
+- Extract selected pages
+- Save as:
+
+E:\mineru_new\output\selected_pages.pdf
+
+Provide option to open/download
+
+TAB 3: Processing (Reconstruction from middle.json)
+
+Provide button: "Process Pages"
+
+On click:
+
+- Load *_middle.json dynamically (DO NOT hardcode path)
+
+Reconstruction Logic:
+
+For each selected page:
+
+1. Read:
+page_size → width, height
+
+2. Create blank canvas using PIL
+
+3. Apply scaling factor (SCALE = 2)
+
+4. Traverse:
+pdf_info → para_blocks → lines → spans
+
+5. Extract:
+text = span["content"]  
+bbox = span["bbox"]
+
+6. Place text using bbox coordinates
+
+7. IMPORTANT:
+- DO NOT draw bounding boxes
+- DO NOT draw rectangles
+- ONLY render text
+
+8. Save output images:
+
+E:\mineru_new\output\reconstructed_pages\clean_page_<n>.png
+
+TAB 4: Output Viewer
+
+Display:
+
+- Reconstructed images  
+- Extracted PDF  
+
+Provide:
+
+- Scrollable preview  
+- Open folder button  
+- Download option  
+
+CORE MINERU PIPELINE (REFERENCE ONLY)
+
+PDF Page
+↓
+Layout Detection (DocLayout-YOLO / LayoutLMv3)
+↓
+OCR (PaddleOCR)
+↓
+Table Recognition (RapidTable / TableStructureRec)
+↓
+Formula Recognition (UniMERNet)
+↓
+Reading Order (LayoutReader)
+↓
+Structured Output (JSON + assets)
+
+NOTE:
+UI does NOT implement models  
+It only triggers MinerU and processes outputs  
+
+ERROR HANDLING
+
+- No PDF selected  
+- MinerU not found  
+- Output folder missing  
+- middle.json missing  
+- Invalid page range  
+
+Show proper UI messages
+
+MODULAR FUNCTIONS
+
+upload_pdf()  
+run_mineru()  
+find_latest_output_folder()  
+find_middle_json()  
+parse_pages()  
+extract_selected_pages_pdf()  
+process_pages()  
+display_outputs()  
+
+PERFORMANCE
+
+Use QThread or threading for:
+- MinerU execution  
+- Processing  
+
+UI must remain responsive  
+
+FINAL FLOW
+
+Upload PDF → copied to input folder  
+Run MinerU → output generated in output folder  
+View extracted files  
+Select pages → export PDF  
+Process pages → generate clean reconstructed images  
+View and download outputs  
+
+The application must work with the locally installed MinerU setup and should not depend on external APIs.

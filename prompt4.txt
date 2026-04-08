@@ -1,0 +1,1120 @@
+You are an expert Python developer and UI architect.
+
+Build a complete PyQt (PyQt5 or PyQt6) desktop application that implements a 4-stage PDF processing pipeline integrated with a locally installed MinerU system.
+
+CORE PRINCIPLE (CRITICAL)
+
+The system must strictly follow selected page control.
+
+Selected pages must control:
+- PDF extraction
+- MinerU processing input
+- Reconstruction (if used)
+- Chunking output
+
+DO NOT process the full PDF unless explicitly selected.
+
+PROJECT STRUCTURE (MANDATORY)
+
+E:\mineru_new\
+├── env\
+├── input\
+├── output\
+├── mineru_models\
+├── ui_app.py
+├── utils\
+│   ├── pdf_handler.py
+│   ├── mineru_runner.py
+│   ├── chunking.py
+
+self.uploaded_pdf_path → original PDF
+self.custom_pdf_path → selected pages PDF
+self.latest_output_folder → MinerU output folder
+self.selected_pages → list of selected page numbers
+self.cleaned_pages_data → preprocessed page-wise cleaned text
+self.total_tokens → total token count (UI only)
+self.chunks → final RAG chunks
+self.rag_output → QA output (Gemini response)
+self.script → narration script (450–500 words)
+self.scenes → structured scene data
+self.image_prompts → generated image prompts
+self.generated_images → generated image paths per scene  
+
+These must be shared across ALL tabs.
+
+TAB 1: PDF UPLOAD
+
+Features:
+- Upload PDF button
+- Show:
+  - File name
+  - File path
+  - Total pages
+
+Behavior:
+- Copy PDF into:
+
+E:\mineru_new\input\
+
+- Store path in:
+  self.uploaded_pdf_path
+
+TAB 2: CUSTOM PAGE SELECTION
+
+Features:
+- Input field supporting:
+  - Single pages → 5, 10
+  - Ranges → 1-5
+  - Multiple ranges → 1-5, 8-10, 15, 20-25
+11. SINGLE-ELEMENT LOCK (STRICT): ONLY ONE focused data card or chart permitted. NO dashboards, grids, or multiple KPI cards. Environment must be an EMPTY solid wall or minimalist corporate room.
+12. LOGO CLARITY LOCK (STRICT): 2.8x BICUBIC Sharpening, 22% width, 3% margins Top-Right.
+13. NEGATIVE PROMPT (MANDATORY): `--no wall-of-cards, dashboard-grid, multiple-panels, mosaic, collage, thumbnails, gallery, cluttered, blurry`.
+  - Multiple ranges → 1-5, 8-10, 15, 20-25
+
+- Button: "Generate Custom PDF"
+
+Parsing Rules:
+- Split by comma
+- Handle ranges and single values
+- Remove duplicates
+- Sort pages
+- Validate page limits
+
+Store result in:
+self.selected_pages
+
+Behavior:
+- Extract ONLY selected pages from original PDF
+- DO NOT extract full PDF
+
+Save in:
+
+E:\mineru_new\output\custom_pages.pdf
+
+Store:
+self.custom_pdf_path
+
+TAB 3: MINERU PROCESSING
+
+Features:
+- Button: "Run MinerU"
+
+Behavior:
+- Run MinerU ONLY on:
+
+self.custom_pdf_path
+
+Command:
+
+mineru -p E:\mineru_new\output\custom_pages.pdf -o E:\mineru_new\output -b pipeline -d cpu -l en
+
+After execution:
+- Detect latest output folder dynamically
+- Store in:
+  self.latest_output_folder
+
+Display inside UI:
+- JSON file
+- Markdown file
+- images/
+- tables/ (if exists)
+
+IMPORTANT:
+- Do NOT process original PDF
+- Only process custom PDF
+
+
+
+TAB 4: PREPROCESSING (UNIVERSAL TEXT NORMALIZATION)
+
+Button: "Process Pages"
+
+Input:
+*_middle.json from self.latest_output_folder
+
+STRICT RULE:
+Process ONLY self.selected_pages
+
+--------------------
+PREPROCESSING STEPS
+--------------------
+
+1. PAGE FILTERING
+- Skip pages not in selected_pages
+
+2. TEXT CONSOLIDATION
+- Merge:
+  - paragraph blocks
+  - spans
+  - broken lines
+- Preserve reading order
+- Output must be continuous readable text
+
+3. DROP IMAGES (MANDATORY)
+- Ignore image_blocks
+- Ignore images folder completely
+- Do NOT include images anywhere
+
+4. UNIVERSAL TABLE PROCESSING
+
+APPLY ONLY IF:
+table_cells < 100
+
+GENERAL TABLE-TO-TEXT LOGIC:
+
+Step 1: Extract structure
+- Identify headers (first row or inferred column labels)
+- Identify rows
+
+Step 2: For each row:
+- Map column → value pairs
+- Convert into natural language
+
+Step 3: Sentence generation rules (GENERIC):
+
+- Use pattern:
+  "<Column> is <Value>"
+
+- If multiple columns:
+  Combine with commas and "and"
+
+- If meaningful key exists (like Year, Name, Product):
+  Use it as subject:
+  Example:
+  "In 2023, revenue was 100M."
+  "Product A had sales of 200 and profit of 50."
+
+- If no clear structure:
+  Fallback:
+  "Column1 is Value1, Column2 is Value2."
+
+Step 4: Combine all row sentences into paragraph text
+
+Step 5: Append to page text
+
+IMPORTANT:
+- Must work for ANY table structure
+- Must not depend on fixed column names
+- Must produce readable sentences
+
+LARGE TABLES (cells ≥ 100):
+- COMPLETELY IGNORE
+
+5. MERGE TABLE TEXT
+- Append generated table text into main page text
+
+6. TEXT CLEANING
+- Remove extra spaces
+- Normalize punctuation
+- Ensure readability
+- Remove noise
+
+7. TOKEN COUNT (UI ONLY)
+
+- Count tokens per page
+- Store per-page tokens
+
+- Compute total tokens:
+  self.total_tokens = sum(page["tokens"] for page in cleaned_pages_data)
+
+Display in UI:
+
+Page 3 → 32 tokens
+Page 5 → 28 tokens
+
+-------------------------
+TOTAL TOKENS → 60
+
+IMPORTANT:
+- Token count is ONLY for UI
+- No chunking in this stage
+
+--------------------
+
+PREPROCESSING OUTPUT
+
+self.cleaned_pages_data = [
+{
+  "page": 3,
+  "text": "...clean structured text...",
+  "tokens": 245
+}
+]
+
+
+
+TAB 5: CHUNKING (FINAL RAG STAGE)
+
+Button: "Generate Chunks"
+
+Input:
+self.cleaned_pages_data
+
+STRICT RULE:
+Use ONLY preprocessed text (no JSON, no images, no tables)
+
+
+CHUNKING STRATEGY
+
+
+1. PAGE-LEVEL SEGMENTATION
+- Process each page independently
+- Preserve page number
+
+2. SENTENCE SPLITTING
+- Split text into sentences
+
+3. CONTEXT-BASED GROUPING (CORE LOGIC)
+- Group sentences into meaningful chunks
+- Start new chunk when:
+  - topic changes
+  - contrast words appear (however, but, etc.)
+  - semantic shift occurs
+
+4. CHUNK SIZE RULES
+- 2–5 sentences per chunk
+- Ideal: 300–400 tokens
+- Max: 500 tokens
+
+If too large:
+→ split at sentence boundary
+
+If too small:
+→ merge with adjacent chunk
+
+5. SLIDING WINDOW (MANDATORY)
+- Overlap last sentence with next chunk
+
+Example:
+Chunk 1 → S1 S2 S3
+Chunk 2 → S3 S4 S5
+
+6. STRICT PAGE CONTROL
+- Only use self.cleaned_pages_data
+- Do NOT access other pages
+
+
+
+FINAL OUTPUT FORMAT
+
+[
+{
+  "section": "General",
+  "type": "text",
+  "content": "Revenue increased by 20% in 2024...",
+  "page": 3
+}
+]
+
+RULES:
+- ONLY TEXT chunks
+- NO tables
+- NO images
+- NO references
+- Clean, readable, standalone content
+
+
+
+OUTPUT LOCATION (STRICT)
+
+Save ONLY to:
+
+E:\mineru_new\output\<latest_output_folder>\chunks.json
+
+DO NOT:
+- Create new folders
+- Duplicate MinerU outputs
+- Save outside this folder
+
+
+
+TAB 6: CONTEXT-BASED QUESTION ANSWERING (AUDIT-GRADE RAG SYSTEM WITH STRICT POST-CRITIC + DYNAMIC PDF LINKING)
+
+You are an expert DOCUMENT QUESTION ANSWERING SYSTEM designed for HIGH-ACCURACY, AUDITABLE RAG OUTPUT.
+
+This system is STRICTLY bound to the provided PDF context and must ensure ZERO hallucination with FULL traceability.
+
+INPUTS
+
+DOCUMENT CONTEXT:
+{document_chunks}
+
+USER QUESTIONS:
+{user_questions}
+
+DOCUMENT NAME:
+{document_name}
+
+PDF BASE URL:
+{pdf_base_url}
+
+Each page in the document is labeled as:
+[Page X]
+
+========================================================
+STAGE 1: ANSWER GENERATION (DIRECT FROM CONTEXT)
+========================================================
+
+Using ONLY DOCUMENT CONTEXT:
+
+You must:
+
+- answer ONLY from PDF text
+- keep answers concise and factual
+- maintain original meaning
+- DO NOT paraphrase numeric values
+- DO NOT hallucinate
+- DO NOT use external knowledge
+
+--------------------------------------------------------
+CRITICAL DATA TRACEABILITY RULE (VERY IMPORTANT)
+--------------------------------------------------------
+
+If answer contains ANY of the following:
+
+- numbers
+- percentages
+- financial values
+- dates
+- metrics
+- structured data
+
+THEN:
+
+1. Value MUST match PDF EXACTLY (character-by-character)
+2. Value MUST come from ONLY ONE PAGE
+3. MUST include exact page reference (Page X)
+4. MUST include exact snippet from PDF
+5. MUST ensure value exists EXACTLY in snippet
+
+IF NOT FOUND:
+
+Return:
+"Not available in document"
+
+--------------------------------------------------------
+STAGE 1 INTERNAL OUTPUT STRUCTURE
+--------------------------------------------------------
+
+[
+  {
+    "question": "string",
+    "answer": "string",
+    "references": [
+      {
+        "page": "Page X",
+        "snippet": "exact line from PDF",
+        "pdf_link": "{pdf_base_url}/{document_name}.pdf#page=X"
+      }
+    ]
+  }
+]
+
+========================================================
+STAGE 2: POST-CRITIC AGENT (STRICT VALIDATION — CORE)
+========================================================
+
+This is the ONLY CRITIC AGENT and is MANDATORY.
+
+After generating the answer, you MUST perform STRICT VALIDATION.
+
+--------------------------------------------------------
+VALIDATION CHECKS (ALL MUST PASS)
+--------------------------------------------------------
+
+1. PAGE VALIDATION
+- Verify that the referenced Page X actually contains the answer
+- Ensure answer is NOT coming from a different page
+
+2. SNIPPET VALIDATION
+- Snippet MUST be exact substring from PDF
+- Snippet MUST contain the answer (or exact value)
+
+3. NUMERIC VALIDATION (ZERO TOLERANCE)
+If answer contains:
+- numbers
+- percentages
+- financial values
+- dates
+
+Then:
+- value MUST exactly match snippet
+- value MUST exactly match PDF
+- value MUST exist in referenced page ONLY
+- value MUST NOT be inferred, calculated, or rounded
+
+STRICTLY FORBIDDEN:
+- 1.2 → 90%
+- 10000 → 10K
+- 5.25 → 5.3
+
+4. PAGE CONSISTENCY CHECK
+- Answer and snippet MUST belong to SAME page
+- NO cross-page merging
+
+5. LINK VALIDATION (CRITICAL)
+- URL MUST follow:
+  {pdf_base_url}/{document_name}.pdf#page=X
+- document_name MUST be correct
+- page number MUST be valid
+- URL MUST be properly formatted
+
+If invalid:
+→ regenerate reference
+
+--------------------------------------------------------
+FAILURE HANDLING
+--------------------------------------------------------
+
+If ANY validation fails:
+
+- REJECT the generated answer
+- REGENERATE using DOCUMENT CONTEXT
+- REPEAT validation
+
+DO NOT output incorrect data
+
+========================================================
+STAGE 3: HTML AUDIT FILE GENERATION (SEPARATE OUTPUT)
+========================================================
+
+After FINAL VALIDATION, generate HTML for audit purposes.
+
+IMPORTANT:
+- NOT part of UI response
+- Used only for verification
+
+--------------------------------------------------------
+PURPOSE
+--------------------------------------------------------
+
+- Display all Q&A
+- Show reference page
+- Provide clickable link to open PDF
+- Show exact snippet
+
+--------------------------------------------------------
+CLICKABLE LINK RULE
+--------------------------------------------------------
+
+Use EXACT format:
+
+{pdf_base_url}/{document_name}.pdf#page=X
+
+- MUST be clickable
+- MUST open correct page
+- MUST work in browser
+- NO PDF.js
+- NO highlight params
+
+--------------------------------------------------------
+HTML TEMPLATE
+--------------------------------------------------------
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RAG Audit Viewer</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #f4f6f8; }
+    .card { background: #ffffff; padding: 16px; margin-bottom: 16px; border-radius: 8px; }
+    .question { font-weight: bold; font-size: 18px; }
+    .answer { margin-top: 8px; }
+    .reference { margin-top: 10px; font-size: 14px; }
+    .link { color: blue; text-decoration: underline; }
+    .snippet { margin-top: 5px; font-style: italic; color: #555; }
+  </style>
+</head>
+<body>
+
+<h2>Document QA Audit</h2>
+
+FOR EACH QA:
+
+<div class="card">
+  <div class="question">Q: {question}</div>
+  <div class="answer">A: {answer}</div>
+
+  IF references exist:
+
+  <div class="reference">
+    Page: {Page X} |
+    <a class="link"
+       href="{pdf_base_url}/{document_name}.pdf#page=X"
+       target="_blank">
+       Open Page in PDF
+    </a>
+    <div class="snippet">{exact snippet}</div>
+  </div>
+
+</div>
+
+END LOOP
+
+</body>
+</html>
+
+========================================================
+FINAL OUTPUT FORMAT (STRICT — UI ONLY)
+========================================================
+
+Return ONLY:
+
+[
+  {
+    "question": "string",
+    "answer": "string",
+    "references": [
+      {
+        "page": "Page X",
+        "snippet": "exact line from PDF"
+      }
+    ]
+  }
+]
+
+--------------------------------------------------------
+IF NOT FOUND
+--------------------------------------------------------
+
+[
+  {
+    "question": "string",
+    "answer": "Not available in document",
+    "references": []
+  }
+]
+
+========================================================
+STRICT OUTPUT RULES
+========================================================
+
+DO NOT INCLUDE:
+
+- html_output
+- pdf_link
+- anchor_id
+- validation logs
+- critic logs
+- reasoning
+
+ONLY return FINAL VERIFIED JSON
+
+========================================================
+FINAL GUARANTEE
+========================================================
+
+- Answer generated directly from context
+- Post-critic ensures correctness
+- RULE 1: ai_prompt ONLY (Single-Source-of-Truth).
+- SINGLE-ELEMENT LOCK: Render exactly one visualization on a minimalist wall.
+- LOGO OVERLAY: 2.8x Sharpening, 22% Width, Top-Right, 3% margins.
+- TRANSPARENCY: 4-Corner sample, 35 tolerance, multi-color removal (White + Container Color).
+- NEGATIVE PROMPT: `--no dashboard-grid, wall-of-cards, multiple-panels, mosaic`.
+- Numeric values EXACT- zero hallucination
+- all numeric values strictly validated from PDF
+- clickable links must work
+- logo consistency: 4% width, 2% margins top-right.
+- STRICT VISUAL GROUNDING: Rules 13-17 enforced.
+- structure must remain identical to specification
+- NEGATIVE PROMPT (MANDATORY): --no extra-data, no-fake-metrics, no-inferred-values, no-extra-bars, no-pie-charts, no-clutter, no-ui-noise.
+- Success-only UI reporting (suppress technical warnings)
+
+
+TAB 7: SCRIPT GENERATION
+
+You are an expert corporate narration scriptwriter and document synthesis engine.
+
+Your task is to generate a **professional 3-minute narration script (450–500 words)** from document-derived input data.
+
+---
+
+## INPUT
+
+You will receive:
+
+```json
+rag_output.json
+```
+
+This file may contain:
+
+* Question–answer style content
+* Extracted text from documents
+* Page references and metadata
+* Repeated or fragmented information
+* Mixed structured/unstructured responses
+
+---
+
+## OBJECTIVE
+
+Convert the raw RAG output into a **clean, continuous, voiceover-ready narration script** that:
+
+* Removes all noise and structure artifacts
+* Merges fragmented information logically
+* Produces smooth professional storytelling
+* Works directly for voiceover and downstream scene generation
+        *   **Logo Clarity**: 2.8x BICUBIC Sharpening, 1.3x Contrast, 35% width, 2% margin top-right.
+        *   **Audit Logic**: Interactive HTML Audit enabled for Step 6 and Step 9.
+        *   **STRICT VISUAL GROUNDING**: Rules 13-17 enforced. No numbers = No charts.
+        *   **Hallucination Block**: Mandate 'Single-element visualization' instead of 'Dashboard'.
+        *   **Negative Prompt**: `--no wall-of-cards, dashboard-grid, mosaic, collage, thumbnails, gallery`.
+        *   **RAG Audit**: Report exactly which pages are loaded in context (Diagnostic Step).
+        *   **PDF Jump**: Add JS window.onload force-anchor jump to Audit HTML templates.
+d downstream scene generation
+
+---
+
+## PROCESS (VERY IMPORTANT)
+
+You MUST:
+
+### 0. DATA PERSISTENCE (CRITICAL)
+*   **Copy `rag_output.json`** from the RAG output folder into the new section folder created for the script. This ensures all downstream stages (Scenes, Images) have local access to physical data sources.
+
+### 1. CLEANING
+
+Remove:
+
+* Page references (e.g., “Page 12”, “p. 5”)
+* Question formats
+* Duplicate content
+* Metadata or retrieval artifacts
+
+---
+
+### 2. MERGING LOGIC
+
+* Combine related answers into unified ideas
+* Avoid repetition
+* Maintain logical continuity across topics
+* Ensure smooth transitions between points
+
+---
+
+### 3. NARRATIVE CONVERSION
+
+Transform all extracted information into:
+
+* Continuous professional narration
+* Natural spoken language
+* Story-driven flow instead of Q&A format
+
+---
+
+## STRUCTURE (MANDATORY BUT NATURAL FLOW)
+
+The script must follow a smooth progression:
+
+### 1. OPENING
+
+* Introduce organization / document context / purpose
+* Establish background and identity
+* Set a professional tone
+
+---
+
+### 2. CORE INSIGHTS
+
+* Summarize key information from the input:
+
+  * achievements
+  * performance highlights
+  * services / initiatives
+  * strategic focus
+  * important data points
+
+* Convert all facts into narrative sentences
+
+---
+
+### 3. CLOSING
+
+* Provide concluding insight
+* Summarize overall message
+* End with forward-looking or vision-oriented statement
+
+---
+
+## STYLE GUIDELINES
+
+* Professional and clear tone
+* Natural spoken narration (voiceover-ready)
+* Smooth transitions between ideas
+* No cinematic, poetic, or exaggerated language
+* No headings or section labels in output
+* No bullet points
+
+---
+
+## CONTENT RULES (CRITICAL)
+
+* Use ONLY information present in `rag_output.json`
+* Do NOT hallucinate or add external knowledge
+* If data is incomplete:
+  → intelligently merge and generalize using available content only
+* Ensure factual consistency
+
+---
+
+## LENGTH
+
+* STRICTLY 450–500 words for 3 minutes video
+
+---
+
+## VOICEOVER OPTIMIZATION
+
+* Write as if being spoken aloud
+* Keep sentences clear and balanced
+* Avoid overly long or complex sentences
+* Maintain smooth rhythm for narration
+
+---
+
+## OUTPUT FORMAT (STRICT)
+
+Return ONLY valid JSON:
+
+```json
+{
+  "script": "Full 450–500 word professional narration script..."
+}
+```
+
+---
+
+## FINAL INSTRUCTIONS
+
+* No explanations
+* No extra text
+* No markdown outside JSON
+* Output must be directly usable in pipeline
+
+---
+
+## GOAL
+
+Generate a **clean, structured, professional narration script** that:
+
+* Works for ANY corporate or institutional document
+* Converts RAG output into storytelling format
+* Feeds directly into:
+  → Scene Generation
+  → Image Prompt Generation
+  → Video Creation pipeline
+
+
+TAB 8: SCENE GENERATION (FULLY DYNAMIC UI-CONTROLLED SCENE COUNT)
+
+You are a deterministic scene segmentation engine that converts narration scripts into structured scene outputs with strict adherence to logical flow, sequencing, and content accuracy.
+
+========================================================
+INPUT
+========================================================
+
+{
+  "script": "Full narration script (approximately 450–500 words)"
+}
+
+IMPORTANT:
+
+- The UI will prompt the user to enter ANY number of scenes (n)
+- This value is passed internally as SCENE_COUNT
+- It is NOT shown in input
+- You MUST strictly generate EXACTLY SCENE_COUNT scenes
+
+NO LIMITS:
+- No minimum restriction like 8
+- No maximum restriction like 10
+- Fully dynamic based on user input
+
+========================================================
+SYSTEM CONTROL VARIABLE (INTERNAL)
+========================================================
+
+SCENE_COUNT = user-defined number of scenes
+
+Examples:
+- 3 scenes
+- 5 scenes
+- 12 scenes
+- 20 scenes
+
+IF SCENE_COUNT is NOT provided:
+→ Default to 8 scenes
+
+========================================================
+OBJECTIVE
+========================================================
+
+Convert the narration script into structured scenes that:
+
+- Preserve exact narration text
+- Follow logical storytelling flow
+- Split content meaningfully
+- STRICTLY match SCENE_COUNT
+
+========================================================
+CORE PRINCIPLE (VERY IMPORTANT)
+========================================================
+
+Scene = One Idea + Exact Narration Segment
+
+Each scene must:
+
+- Represent ONE clear idea (as much as possible)
+- Use EXACT script text
+- Maintain logical continuity
+
+IMPORTANT ADAPTATION:
+
+- If SCENE_COUNT is SMALL → merge ideas logically
+- If SCENE_COUNT is LARGE → split ideas carefully
+
+========================================================
+PROCESS
+========================================================
+
+STEP 1: FULL SCRIPT ANALYSIS
+
+- Read entire script carefully
+- Identify:
+  - topic transitions
+  - idea shifts
+  - logical flow:
+    start → growth → performance → customers → innovation → future
+
+--------------------------------------------------------
+STEP 2: BASE SEGMENTATION (FLEXIBLE)
+--------------------------------------------------------
+
+- Create an initial logical segmentation of the script
+- No fixed number required
+- Focus on meaning boundaries
+
+--------------------------------------------------------
+STEP 3: SCENE COUNT ADJUSTMENT (CRITICAL)
+--------------------------------------------------------
+
+You MUST transform segmentation to EXACTLY match SCENE_COUNT
+
+CASE 1: SCENE_COUNT is SMALL (e.g., 3–5)
+
+- Merge multiple ideas into one scene
+- Ensure:
+  - readability
+  - logical grouping
+  - no abrupt jumps
+
+CASE 2: SCENE_COUNT is MEDIUM (e.g., 6–10)
+
+- Maintain balanced segmentation
+- 1–3 sentences per scene
+
+CASE 3: SCENE_COUNT is LARGE (e.g., 10–20+)
+
+- Split scenes finely
+- Each scene may contain:
+  - 1 sentence
+  - or part of a long sentence (ONLY if grammatically valid)
+
+STRICT:
+- NEVER break sentence incorrectly
+- NEVER lose meaning
+- NEVER skip content
+
+FINAL RESULT:
+→ EXACT number of scenes = SCENE_COUNT
+
+========================================================
+TEXT HANDLING (STRICT)
+========================================================
+
+For each scene:
+
+- Use EXACT narration text
+- DO NOT rewrite
+- DO NOT summarize
+- DO NOT paraphrase
+
+========================================================
+TITLE GENERATION
+========================================================
+
+- 2–5 words
+- Must reflect the core idea of the scene
+
+========================================================
+OPTIONAL THEME FIELD
+========================================================
+
+Include ONLY if clearly identifiable:
+
+Allowed themes:
+- trust
+- financial performance
+- customer impact
+- business growth
+- digital transformation
+- innovation
+- risk and governance
+- sustainability
+- employee culture
+- future vision
+
+Rules:
+- Do NOT force theme
+- Do NOT assign multiple themes
+- If unclear → omit
+
+========================================================
+VALIDATION RULES (MANDATORY)
+========================================================
+
+Before output:
+
+- Scene count EXACTLY equals SCENE_COUNT
+- Full script is covered
+- No duplication
+- No content loss
+- Logical flow preserved
+
+IF ANY FAILURE:
+→ regenerate
+
+========================================================
+OUTPUT FORMAT (STRICT JSON ONLY)
+========================================================
+
+[
+  {
+    "scene": 1,
+    "title": "Short title",
+    "text": "Exact narration text from script...",
+    "theme": "optional"
+  }
+]
+
+========================================================
+STRICT RULES
+========================================================
+
+- Do NOT modify narration text
+- Do NOT skip content
+- Do NOT add visual instructions
+- Do NOT add explanations
+- Do NOT enforce fixed scene limits
+- Do NOT output fewer or more scenes than SCENE_COUNT
+
+========================================================
+FINAL INSTRUCTIONS
+========================================================
+
+- Output ONLY valid JSON
+- No extra text
+- No markdown outside JSON
+- STRICTLY follow SCENE_COUNT from UI
+- Support ANY number of scenes dynamically
+- Maintain deterministic, production-grade structure
+
+
+THREADING (CRITICAL)
+
+Use QThread for all heavy or blocking operations:
+
+MinerU processing
+Preprocessing (JSON parsing, text normalization)
+Chunking (sentence grouping, semantic processing)
+Embedding computation (if added later)
+LLM inference (Gemini API):
+QA
+Script generation
+Scene generation
+Image prompt generation
+Image generation (API-based calls)
+
+
+
+RULES
+UI must remain fully responsive at all times
+No heavy processing in the main UI thread
+Use signal-slot mechanism to communicate with UI
+THREAD SIGNALS (MANDATORY)
+
+Each threaded task must emit:
+
+"Running..." → when started
+"Completed" → on success
+"Failed" → on error
+
+ERROR HANDLING (STRICT)
+The system must handle and report the following errors clearly:
+No PDF uploaded
+Invalid page range format or out-of-bounds pages
+Missing custom_pages.pdf
+MinerU execution failure
+Missing or invalid *_middle.json
+Missing chunks.json
+Preprocessing failure
+Chunking failure
+Gemini API failure (network/auth/response issues)
+No matching chunks for query
+Model load failure (if local models used)
+Scene generation failure
+Image generation API failure
+Logo visibility threshold failure
+Data grounding mismatch
+
+ERROR RULES
+Errors must NOT crash the application
+Errors must be surfaced to UI via signals
+Show clear, user-friendly error messages
+Stop only the failed stage, not entire pipeline unless critical
+
+FINAL WORKFLOW (STRICT ORDER)
+Upload PDF
+Select pages
+Generate custom PDF
+Run MinerU (only on selected pages)
+Preprocess text (only selected pages)
+Generate chunks
+Run LLM (QA using chunks)
+Generate script
+Generate scenes
+Generate image prompts
+Generate images
+
+WORKFLOW RULES
+Each step depends strictly on previous step output
+Do NOT skip steps
+Do NOT use original PDF after page selection
+Always use derived data (custom PDF → MinerU → cleaned → chunks)
+FINAL CONSTRAINTS (MANDATORY)
+ONLY selected pages must be processed across ALL stages
+NO full PDF processing unless explicitly selected
+NO hallucination: LLM must use ONLY provided context
+NO external data injection
+
+OUTPUT STORAGE (STRICT)
+All outputs must be saved ONLY inside:
+E:\mineru_new\output<latest_output_folder>\
+
+STORAGE RULES
+DO NOT create additional folders outside this path
+DO NOT duplicate MinerU outputs
+
+CONTENT RULES
+Only TEXT is allowed in processing stages
+NO images in chunks or intermediate text outputs
+NO tables (must be converted or dropped earlier)
+NO references or metadata in final chunks
+
+SYSTEM BEHAVIOR GUARANTEE
+Deterministic processing flow
+Strict data control via selected pages
+Clean separation between stages
+Thread-safe execution
+UI-safe updates via signals only
+Scalable pipeline (ready for future video generation stages)

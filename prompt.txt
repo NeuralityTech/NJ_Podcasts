@@ -1,0 +1,133 @@
+You are an expert Python developer specializing in Tkinter UI and document processing pipelines.
+
+Build a complete desktop application using Tkinter for a PDF-to-structured-output pipeline integrated with MinerU-style JSON parsing.
+
+The application must include the following components and behavior:
+
+
+1. Upload Section
+
+- A button labeled "Upload PDF"
+- Allows user to select a PDF file from the local system
+- Display selected file name in the UI
+- Automatically derive the corresponding MinerU JSON path using this format:
+
+  E:\mineru_new\output\<pdf_name>\auto\<pdf_name>_middle.json
+
+2. Parsing Section
+
+- A button labeled "Parse Pages"
+- On click:
+  → Show a dropdown menu for page selection
+
+Dropdown must include:
+  - All Pages
+  - First N Pages (e.g., First 3, First 5)
+  - Custom Range (e.g., 1-3, 5, 7-9)
+
+
+3. Page Selection Logic
+
+- Ensure no duplicate pages
+- Support:
+  - Continuous ranges (1-5)
+  - Mixed selections (1,3,5-7)
+- Convert user input into a valid sorted list of page numbers
+- Validate inputs and show error if invalid
+
+
+4. Processing Section
+
+- A button labeled "Process"
+- On click:
+  → Read the MinerU JSON file
+  → Extract data from "pdf_info"
+
+Processing logic must follow EXACTLY:
+
+For each selected page:
+  - Read page_size
+  - Create a blank image canvas using PIL
+  - Apply scaling factor (e.g., SCALE = 2)
+  - Loop through:
+      para_blocks → lines → spans
+  - Extract:
+      span["content"]
+      span["bbox"]
+  - Scale bounding boxes
+  - Draw:
+      rectangles (bounding boxes)
+      text on canvas
+  - Save output as:
+      page_<n>.png
+
+
+5. Output Section
+
+- A scrollable text box
+- Display results like:
+
+  Page 1
+
+  Saved: <output_path>
+
+  Page 2
+ 
+  Saved: <output_path>
+
+
+6. UI Design Requirements
+
+- Use Tkinter Frames for clean layout
+- Proper spacing and alignment
+- Sections:
+  - Upload Frame
+  - Parse Frame
+  - Process Frame
+  - Output Frame
+
+
+7. Error Handling
+
+- Show error if:
+  - No PDF selected
+  - JSON file not found
+  - Invalid page selection
+- Prevent crashes using safe checks
+
+
+8. Modularity (IMPORTANT)
+
+Code must be structured into functions:
+
+- upload_pdf()
+- parse_pages()
+- get_selected_pages()
+- parse_custom_pages()
+- process_pages()
+
+
+9. Bonus Features (Highly Recommended)
+- Add progress bar during processing
+- Add status label:
+    "Processing..."
+    "Done"
+- Use threading to prevent UI freezing
+
+10. Constraints
+
+- Must use:
+    Tkinter
+    PIL (Image, ImageDraw, ImageFont)
+    JSON
+    OS
+- Do NOT use web frameworks
+- Code must be clean, readable, and extensible
+
+
+
+The final application should allow:
+
+PDF Upload → Page Selection → JSON Parsing → Bounding Box Reconstruction → Image Output Display
+
+Ensure the UI is responsive, robust, and production-ready.
