@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NJ Podcasts - Feature Testing & Analysis Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #10b981;
+            --border: #334155;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, var(--primary-light), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.1);
+        }
+
+        .feature-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .feature-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.3rem;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .feature-tag {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary-light);
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .description {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+        }
+
+        .testing-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: auto;
+        }
+
+        .testing-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--warning);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .code-block {
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.8rem;
+            background: #000;
+            padding: 0.8rem;
+            border-radius: 6px;
+            color: #d1d5db;
+            overflow-x: auto;
+            border: 1px solid #334155;
+        }
+
+        .output-capture {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 1.5rem; }
+            h1 { font-size: 2rem; }
+            .test-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Feature Testing Guide</h1>
+            <p class="subtitle">Independent verification workflows for core project modules</p>
+        </header>
+
+        <div class="test-grid">
+            <!-- Scene Generation -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">scene_generation.py</span>
+                    <span class="feature-tag">AI Logic</span>
+                </div>
+                <p class="description">Transforms text content into visual scene descriptions for podcast visualization.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        import utils.scene_generation as sg<br>
+                        text = "The universe is expanding rapidly."<br>
+                        scenes = sg.generate_scenes(text)<br>
+                        print(scenes)
+                    </div>
+                    <p class="output-capture">Capture: List of scene objects with visual descriptions.</p>
+                </div>
+            </div>
+
+            <!-- Image Prompt Generation -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">image_prompt_gen.py</span>
+                    <span class="feature-tag">AI Logic</span>
+                </div>
+                <p class="description">Refines raw scene data into descriptive prompts for DALL-E/Midjourney.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        from utils import image_prompt_generation as ipg<br>
+                        raw = "A futuristic city at night."<br>
+                        refined = ipg.refine_prompt(raw)<br>
+                        print(refined)
+                    </div>
+                    <p class="output-capture">Capture: High-detail text prompt string.</p>
+                </div>
+            </div>
+
+            <!-- Chunking -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">chunking.py</span>
+                    <span class="feature-tag">Data</span>
+                </div>
+                <p class="description">Handles logical splitting of large documents for LLM context window limits.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        from utils import chunking<br>
+                        long_text = "..." * 1000<br>
+                        chunks = chunking.split_text(long_text, max_size=500)<br>
+                        print(f"Total chunks: {len(chunks)}")
+                    </div>
+                    <p class="output-capture">Capture: Count and sample of text segments.</p>
+                </div>
+            </div>
+
+            <!-- PDF Handler -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">pdf_handler.py</span>
+                    <span class="feature-tag">File IO</span>
+                </div>
+                <p class="description">Core utility for extracting raw data from uploaded PDF documents.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        from utils import pdf_handler<br>
+                        data = pdf_handler.extract_all("sample.pdf")<br>
+                        print(data.keys())
+                    </div>
+                    <p class="output-capture">Capture: Dictionary containing 'text' and 'images'.</p>
+                </div>
+            </div>
+
+            <!-- Retrieval/RAG -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">retrieval_extraction.py</span>
+                    <span class="feature-tag">AI Logic</span>
+                </div>
+                <p class="description">Uses RAG to pick out relevant information from the extracted document data.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        from utils import retrieval_extraction as re<br>
+                        query = "What is the primary conclusion?"<br>
+                        ans = re.extract_info(query, source_text)<br>
+                        print(ans)
+                    </div>
+                    <p class="output-capture">Capture: LLM-generated answer based on context.</p>
+                </div>
+            </div>
+
+            <!-- Model Config -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">models_config.py</span>
+                    <span class="feature-tag">Config</span>
+                </div>
+                <p class="description">Validates and provides access to API keys and model parameters.</p>
+                <div class="testing-section">
+                    <div class="testing-title">Independent Test Script</div>
+                    <div class="code-block">
+                        from utils import models_config as config<br>
+                        status = config.test_api_connection()<br>
+                        print(f"API Online: {status}")
+                    </div>
+                    <p class="output-capture">Capture: Boolean (True/False).</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

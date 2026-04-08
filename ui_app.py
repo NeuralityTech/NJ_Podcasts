@@ -1,5 +1,6 @@
 import sys
 import os
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 import shutil
 import json
 import re
@@ -217,7 +218,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(GLOBAL_STYLE)
         
         # Service Account Configuration
-        self.service_account_file = "gen-lang-client-0270986555-0ed5b1a8f0f3.json"
+        self.service_account_file = "neurality-nj-e776c5d11c91.json"
         if os.path.exists(self.service_account_file):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(self.service_account_file)
 
@@ -897,7 +898,7 @@ class MainWindow(QMainWindow):
         count_layout = QHBoxLayout()
         count_layout.addWidget(QLabel("Number of Scenes to Generate:"))
         self.scene_count_spin = QSpinBox()
-        self.scene_count_spin.setRange(3, 200)
+        self.scene_count_spin.setRange(1, 200)
         self.scene_count_spin.setValue(8) # Default per prompt4.txt
         count_layout.addWidget(self.scene_count_spin)
         scene_layout.addLayout(count_layout)

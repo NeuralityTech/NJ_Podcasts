@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MinerU 10-Stage Pipeline: Migration Setup Guide</title>
+    <style>
+        :root {
+            --primary: #004C8F;
+            --accent: #ffeb3b;
+            --bg: #f8fafc;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: #333; line-height: 1.6; margin: 0; padding: 0; }
+        .header { background: var(--primary); color: white; padding: 2rem; text-align: center; border-bottom: 5px solid var(--accent); }
+        .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: var(--primary); border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .step { margin-bottom: 2rem; border-left: 4px solid var(--primary); padding-left: 1.5rem; }
+        .code { background: #1e293b; color: #38bdf8; padding: 1rem; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 14px; display: block; margin-top: 10px; }
+        .warning { background: #fffbeb; border: 1px solid #fde68a; padding: 1rem; border-radius: 8px; color: #92400e; margin-top: 1rem; }
+        .success-badge { color: #059669; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MinerU 10-Stage Project Migration</h1>
+    <p>Secure Setup & Deployment Guide for Additional PCs</p>
+</div>
+
+<div class="container">
+    <h2>🚀 Quick Start (New PC)</h2>
+    
+    <div class="step">
+        <h3>1. Extract Migration Package</h3>
+        <p>Unzip the <strong>MinerU_Pipeline_Full_Package.zip</strong> file into your working directory (e.g., <code>e:\mineru_project\</code>).</p>
+    </div>
+
+    <div class="step">
+        <h3>2. Validate Credentials</h3>
+        <p>Ensure the following file exists in your project root. Do <strong>NOT</strong> share this file publicly!</p>
+        <span class="code">neurality-nj-e776c5d11c91.json</span>
+        <div class="warning">⚠️ Without this file, all Step 6 (RAG) through Step 10 (Images) AI functions will fail.</div>
+    </div>
+
+    <div class="step">
+        <h3>3. Initialize Virtual Environment</h3>
+        <p>Open a terminal (PowerShell/Bash) in the project folder and run:</p>
+        <span class="code">
+            python -m venv env<br>
+            .\env\Scripts\activate
+        </span>
+    </div>
+
+    <div class="step">
+        <h3>4. Install Dependencies</h3>
+        <p>Update your local PIP environment with the required UI and AI frameworks:</p>
+        <span class="code">pip install -r requirements.txt</span>
+    </div>
+
+    <div class="step">
+        <h3>5. Run the Application</h3>
+        <p>Launch the 10-Stage Pipeline UI:</p>
+        <span class="code">python ui_app.py</span>
+    </div>
+
+    <hr>
+
+    <h2>📑 Troubleshooting</h2>
+    <ul>
+        <li><strong>MinerU OCR Missing:</strong> If Step 3 fails, the <code>mineru_models</code> folder may be missing. The system will attempt a new download, but manually copying the folder is faster.</li>
+        <li><strong>Branding Fail:</strong> Ensure the <code>reference-pic/</code> folder is present. The logo engine expects <strong>download.jpg</strong> for high-fidelity branding.</li>
+        <li><strong>Module Errors:</strong> Re-run Step 4 if you encounter "PyQt5" or "fitz" not found.</li>
+    </ul>
+
+    <p align="center" class="success-badge">✅ YOU ARE NOW READY FOR PRODUCTION!</p>
+</div>
+
+</body>
+</html>

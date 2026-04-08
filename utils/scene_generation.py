@@ -41,7 +41,7 @@ CORE SCENE RULES:
 2. NARRATION: Use EXACT narration text (DO NOT paraphrase).
 3. STRUCTURE: Every object MUST have "scene", "title", "text", "theme".
 4. SEGMENTATION: 
-   - If {scene_count} is small (e.g. 3-5), merge sentences into dense thematic scenes.
+   - If {scene_count} is small (e.g. 1-5), merge sentences into dense thematic scenes.
    - If {scene_count} is large (e.g. 15-20), split sentences into highly granular scenes.
 5. INDEXING: Scene numbers MUST go from 1 to {scene_count}.
 

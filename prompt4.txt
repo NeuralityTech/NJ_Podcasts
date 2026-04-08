@@ -900,7 +900,7 @@ STEP 3: SCENE COUNT ADJUSTMENT (CRITICAL)
 
 You MUST transform segmentation to EXACTLY match SCENE_COUNT
 
-CASE 1: SCENE_COUNT is SMALL (e.g., 3–5)
+CASE 1: SCENE_COUNT is SMALL (e.g., 1–5)
 
 - Merge multiple ideas into one scene
 - Ensure:
