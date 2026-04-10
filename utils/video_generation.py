@@ -90,6 +90,7 @@ def process_video_generation(project_folder, *args):
                         prompt=(
                             "TERMINATE ALL GENERATIVE DECODING. DO NOT ATTEMPT TO RE-DRAW TEXT. "
                             "STRICT MANDATORY IDENTITY. EVERY CHARACTER MUST BE DUST-FOR-DUST IDENTICAL TO SOURCE. "
+                            "DO NOT WRITE ANY NEW TEXT. DO NOT REWRITE EXISTING TEXT. IGNORE ALL ALPHABETICAL DATA. "
                             "NO EXTRA LINES. NO EXTRA SYMBOLS. NO EXTRA CONTENT. NO CROSS MARKS. "
                             "NO MOTION. NO ZOOM. NO PERSPECTIVE SHIFT. FLATTENED REPLICA. "
                             "RENDER AS BITMAP MASTER RESOURCE. IDENTITY LOCK=1.0. "

@@ -42,9 +42,9 @@ TECHNICAL ENGINE CONSTRAINTS (VEO 3.1)
    - All images must be passed with 'reference_type': 'asset'.
    - This ensures the AI treats the image as a physical scene, not a style guide.
 
-3. CLOUD POLLING LOGIC
-   - System must use manual polling (operation.done) every 10 seconds.
-   - Retrieval must target 'video_bytes' or 'uri' based on SDK response.
+3. CLOUD POLLING & RELIABILITY
+   - System must use manual polling (operation.done) every 15 seconds.
+   - RETRY LOOP: Failed shots must be retried up to 3 times to prevent skipping scenes.
 
 ---
 
@@ -53,16 +53,19 @@ AESTHETIC & FIDELITY RULES (DIRECTOR'S CUT)
 1. ANTI-UI HALLUCINATION (PROMPT STRICTNESS)
    - Never use: "presentation", "slide", "view", "dashboard".
    - Explicitly forbid: "NO UI", "NO CLOSE BUTTONS", "NO CROSS-MARKS", "NO BORDERS".
-   - This prevents the AI from adding "Computer Window" decorations to white backgrounds.
 
-2. FULL-SCREEN 16:9 LOCK
-   - Mandatory Instruction: "FILL THE ENTIRE 16:9 FRAME. NO LETTERBOXING. NO PADDING."
+2. THE 'NO-WRITING' RULE (CRITICAL)
+   - The AI is strictly forbidden from adding ANY new characters.
+   - DO NOT WRITE ANY NEW TEXT. DO NOT REWRITE EXISTING TEXT. IGNORE ALL ALPHABETICAL DATA.
+   - All text in the image must be treated as STATIC ARTWORK that cannot be read or re-typed.
+
+3. FULL-SCREEN 16:9 LOCK
+   - Mandatory Instruction: "FILL THE ENTIRE 16:9 FRAME. EDGE-TO-EDGE. NO PADDING."
    - Images must cover every pixel of the widescreen canvas.
 
-3. MOTION ARCHETYPES
-   - INTRO LOGO (Shot 1): "Professional Cinematic Zoom-In. Slow and smooth."
+4. MOTION ARCHETYPES (STABILITY LOCK)
    - CONTENT SCENES: "ABSOLUTELY STILL. NO MOTION. NO ZOOM. NO PAN."
-   - OUTRO LOGO (Last Shot): "Static Anchor. No motion."
+   - NO 3D WARPING: Forbid perspective shifts to prevent text distortion.
 
 ---
 
