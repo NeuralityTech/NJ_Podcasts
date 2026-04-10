@@ -26,3 +26,10 @@ reference-pic/
 .idea/
 .DS_Store
 Thumbs.db
+
+# VIDEOS & AUDIO (LOCALLY RENDERED)
+*.mp4
+*.mp3
+*.webm
+*.wav
+

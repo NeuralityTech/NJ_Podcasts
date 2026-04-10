@@ -3,7 +3,7 @@ import json
 from google.genai import types
 from utils.models_config import get_gemini_client
 
-def run_scene_generation(script_json_path, api_key, scene_count=8):
+def run_scene_generation(script_json_path, api_key, scene_count=8, service_account_path=None):
     if not os.path.exists(script_json_path):
         return None, "script.json not found."
 
@@ -13,7 +13,7 @@ def run_scene_generation(script_json_path, api_key, scene_count=8):
     script_text = script_data.get("script", "")
     
     try:
-        client = get_gemini_client(api_key)
+        client = get_gemini_client(api_key, service_account_path)
         if not client:
             return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
         
@@ -78,9 +78,9 @@ OUTPUT FORMAT (STRICT JSON ARRAY):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
-def process_scene_generation(latest_output_folder, api_key, scene_count=8):
+def process_scene_generation(latest_output_folder, api_key, scene_count=8, service_account_path=None):
     script_path = os.path.join(latest_output_folder, "script.json")
-    scenes_json, msg = run_scene_generation(script_path, api_key, scene_count)
+    scenes_json, msg = run_scene_generation(script_path, api_key, scene_count, service_account_path)
     if not scenes_json: return None, msg
     
     output_path = os.path.join(latest_output_folder, "scene.json")

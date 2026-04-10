@@ -1,0 +1,81 @@
+# =========================================================================
+# VEO 3.1 VIDEO ORCHESTRATION ENGINE - MASTER ARCHITECTURE
+# =========================================================================
+
+SYSTEM OPERATING MODES
+
+MODE A: FULL PIPELINE (SEQUENTIAL)
+----------------------------------
+Goal: Generate video from a brand new PDF/Script input.
+Workflow: PDF Upload -> Script -> Scenes -> Image Prompts -> Images -> Video.
+Rules:
+* Each stage must validate the output of the previous stage.
+* Stage 10 (Sequencing) must generate 'sequence.json' before Stage 11 starts.
+* Target Total Duration: 180 Seconds (Orchestrated).
+
+MODE B: DIRECT PROJECT (AUTONOMOUS)
+-----------------------------------
+Goal: Generate/Re-generate video using existing assets.
+Input: A folder containing 'sequence.json' and 'section_xx/images/'.
+Rules:
+* Bypasses Tabs 1-10 entirely.
+* Deduplicates logos (uses intro/outro once).
+* Self-corrects for missing images by skipping invalid indices.
+
+---
+
+INPUT SOURCE STRUCTURE
+Project Root/
+├── sequence.json          # Master timeline and scene order
+└── section_xx/            # Folders per story section
+    └── images/            # Logo and Content PNGs (1920x1080)
+
+---
+
+TECHNICAL ENGINE CONSTRAINTS (VEO 3.1)
+
+1. MANDATORY DURATION [8s]
+   - The Veo 3.1 'reference_to_video' engine strictly requires 8-second segments.
+   - Long-form video is created by stitching these 8s high-fidelity anchors.
+
+2. ASSET REFERENCE TYPE
+   - All images must be passed with 'reference_type': 'asset'.
+   - This ensures the AI treats the image as a physical scene, not a style guide.
+
+3. CLOUD POLLING LOGIC
+   - System must use manual polling (operation.done) every 10 seconds.
+   - Retrieval must target 'video_bytes' or 'uri' based on SDK response.
+
+---
+
+AESTHETIC & FIDELITY RULES (DIRECTOR'S CUT)
+
+1. ANTI-UI HALLUCINATION (PROMPT STRICTNESS)
+   - Never use: "presentation", "slide", "view", "dashboard".
+   - Explicitly forbid: "NO UI", "NO CLOSE BUTTONS", "NO CROSS-MARKS", "NO BORDERS".
+   - This prevents the AI from adding "Computer Window" decorations to white backgrounds.
+
+2. FULL-SCREEN 16:9 LOCK
+   - Mandatory Instruction: "FILL THE ENTIRE 16:9 FRAME. NO LETTERBOXING. NO PADDING."
+   - Images must cover every pixel of the widescreen canvas.
+
+3. MOTION ARCHETYPES
+   - INTRO LOGO (Shot 1): "Professional Cinematic Zoom-In. Slow and smooth."
+   - CONTENT SCENES: "ABSOLUTELY STILL. NO MOTION. NO ZOOM. NO PAN."
+   - OUTRO LOGO (Last Shot): "Static Anchor. No motion."
+
+---
+
+PRODUCTION WORKFLOW (STITCHING & CLEANUP)
+
+1. SEQUENTIAL ASSEMBLY
+   - Render shots as individual high-fidelity .mp4 files.
+   - Stitch shots in index order: [Logo Start] -> [Scene 01...N] -> [Logo End].
+
+2. FINAL PACKAGING (MOVIEPY)
+   - Combine clips into a single 'final_video.mp4'.
+   - Export with zero audio and consistent 24fps.
+
+3. PURGE PROTOCOL
+   - Automatically delete temporary .mp4 shot files after successful stitching.
+   - Leave only the 'final_video.mp4' in the project root.

@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QSpinBox, QStackedWidget
 )
 from PyQt5.QtCore import Qt, pyqtSlot, QThread, pyqtSignal
+from PyQt5.QtGui import QIntValidator
 
 # Import custom utilities
 from utils.pdf_handler import parse_page_range, extract_pages
@@ -22,6 +23,7 @@ from utils.script_generation import process_script_generation
 from utils.scene_generation import process_scene_generation
 from utils.image_prompt_generation import process_image_prompt_generation
 from utils.image_generation import process_image_generation
+from utils.video_generation import process_video_generation
 
 # Preprocessing Runner (QThread for Step 4)
 class PreprocessingRunner(QThread):
@@ -46,15 +48,16 @@ class PreprocessingRunner(QThread):
 class RetrievalRunner(QThread):
     finished = pyqtSignal(bool, str, str)
 
-    def __init__(self, latest_output_folder, questions, api_key):
+    def __init__(self, latest_output_folder, questions, api_key, service_account_path=None):
         super().__init__()
         self.latest_output_folder = latest_output_folder
         self.questions = questions # This is a list
         self.api_key = api_key
+        self.service_account_path = service_account_path
 
     def run(self):
         try:
-            path, message = process_retrieval_extraction(self.latest_output_folder, self.questions, self.api_key)
+            path, message = process_retrieval_extraction(self.latest_output_folder, self.questions, self.api_key, self.service_account_path)
             if path:
                 self.finished.emit(True, message, path)
             else:
@@ -66,14 +69,15 @@ class RetrievalRunner(QThread):
 class ScriptRunner(QThread):
     finished = pyqtSignal(bool, str, str)
 
-    def __init__(self, latest_output_folder, api_key):
+    def __init__(self, latest_output_folder, api_key, service_account_path=None):
         super().__init__()
         self.latest_output_folder = latest_output_folder
         self.api_key = api_key
+        self.service_account_path = service_account_path
 
     def run(self):
         try:
-            path, message = process_script_generation(self.latest_output_folder, self.api_key)
+            path, message = process_script_generation(self.latest_output_folder, self.api_key, self.service_account_path)
             if path:
                 self.finished.emit(True, message, path)
             else:
@@ -85,11 +89,12 @@ class ScriptRunner(QThread):
 class SceneRunner(QThread):
     finished = pyqtSignal(bool, str, str)
 
-    def __init__(self, latest_output_folder, api_key, scene_count=8):
+    def __init__(self, latest_output_folder, api_key, scene_count=8, service_account_path=None):
         super().__init__()
         self.latest_output_folder = latest_output_folder
         self.api_key = api_key
         self.scene_count = scene_count
+        self.service_account_path = service_account_path
 
     def run(self):
         try:
@@ -98,7 +103,7 @@ class SceneRunner(QThread):
             if os.path.exists(old_scene_file):
                 os.remove(old_scene_file)
 
-            path, message = process_scene_generation(self.latest_output_folder, self.api_key, self.scene_count)
+            path, message = process_scene_generation(self.latest_output_folder, self.api_key, self.scene_count, self.service_account_path)
             if path:
                 self.finished.emit(True, f"{message} (Requested {self.scene_count} scenes)", path)
             else:
@@ -110,14 +115,15 @@ class SceneRunner(QThread):
 class ImagePromptRunner(QThread):
     finished = pyqtSignal(bool, str, str)
 
-    def __init__(self, latest_output_folder, api_key):
+    def __init__(self, latest_output_folder, api_key, service_account_path=None):
         super().__init__()
         self.latest_output_folder = latest_output_folder
         self.api_key = api_key
+        self.service_account_path = service_account_path
 
     def run(self):
         try:
-            path, message = process_image_prompt_generation(self.latest_output_folder, self.api_key)
+            path, message = process_image_prompt_generation(self.latest_output_folder, self.api_key, self.service_account_path)
             if path:
                 self.finished.emit(True, message, path)
             else:
@@ -129,20 +135,40 @@ class ImagePromptRunner(QThread):
 class ImageGenerationRunner(QThread):
     finished = pyqtSignal(bool, str, str)
 
-    def __init__(self, latest_output_folder, api_key):
+    def __init__(self, latest_output_folder, api_key, service_account_path=None):
         super().__init__()
         self.latest_output_folder = latest_output_folder
         self.api_key = api_key
+        self.service_account_path = service_account_path
 
     def run(self):
         try:
-            path, message = process_image_generation(self.latest_output_folder, self.api_key)
+            path, message = process_image_generation(self.latest_output_folder, self.api_key, self.service_account_path)
             if path:
                 self.finished.emit(True, message, path)
             else:
                 self.finished.emit(False, message, "")
         except Exception as e:
             self.finished.emit(False, f"Error: {str(e)}", "")
+
+class VideoGenerationRunner(QThread):
+    finished = pyqtSignal(bool, str, dict)
+
+    def __init__(self, project_folder, api_key, service_account_path=None):
+        super().__init__()
+        self.project_folder = project_folder
+        self.api_key = api_key
+        self.service_account_path = service_account_path
+
+    def run(self):
+        try:
+            result, message = process_video_generation(self.project_folder, self.api_key, self.service_account_path)
+            if result:
+                self.finished.emit(True, message, result)
+            else:
+                self.finished.emit(False, message, {})
+        except Exception as e:
+            self.finished.emit(False, f"Error: {str(e)}", {})
 
 # Custom Modern Styling
 GLOBAL_STYLE = """
@@ -158,12 +184,12 @@ QTabWidget::pane {
 QTabBar::tab {
     background: #e9ecef;
     border: 1px solid #dee2e6;
-    padding: 8px 6px;
+    padding: 10px 15px;
     margin-right: 2px;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     color: #495057;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: bold;
 }
 QTabBar::tab:selected {
@@ -213,7 +239,7 @@ QLineEdit, QTextEdit {
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MinerU Advanced 10-Stage Pipeline")
+        self.setWindowTitle("MinerU Advanced 11-Stage Pipeline")
         self.resize(1200, 850)
         self.setStyleSheet(GLOBAL_STYLE)
         
@@ -292,6 +318,11 @@ class MainWindow(QMainWindow):
         self.tab10 = QWidget()
         self.setup_tab10()
         self.tabs.addTab(self.tab10, "10. Image Generation")
+
+        # Tab 11: Video Generation (Step 11)
+        self.tab11 = QWidget()
+        self.setup_tab11()
+        self.tabs.addTab(self.tab11, "11. Video Generation")
     # --- TAB 1: PDF UPLOAD ---
     def setup_tab1(self):
         layout = QVBoxLayout()
@@ -591,6 +622,20 @@ class MainWindow(QMainWindow):
         group_qa = QGroupBox("Context-Based Q&A (Gemini AI)")
         qa_layout = QVBoxLayout()
         
+        # --- NEW SERVICE ACCOUNT OVERRIDE ---
+        auth_layout = QHBoxLayout()
+        auth_layout.addWidget(QLabel("Vertex AI JSON (Optional):"))
+        self.btn_upload_vertex = QPushButton("Upload Vertex JSON")
+        self.btn_upload_vertex.clicked.connect(self.upload_vertex_json)
+        self.btn_upload_vertex.setStyleSheet("background-color: #6c757d; padding: 5px 10px; font-size: 12px;")
+        auth_layout.addWidget(self.btn_upload_vertex)
+        self.lbl_vertex_status = QLabel("Default Used")
+        self.lbl_vertex_status.setStyleSheet("color: #666; font-size: 11px;")
+        if os.path.exists(self.service_account_file):
+            self.lbl_vertex_status.setText(f"Active: {os.path.basename(self.service_account_file)}")
+        auth_layout.addWidget(self.lbl_vertex_status)
+        qa_layout.addLayout(auth_layout)
+        
         # Mode Selection Dropdown
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("Questioning Mode:"))
@@ -664,6 +709,15 @@ class MainWindow(QMainWindow):
         
         layout.setStretch(0, 1)
         self.tab6.setLayout(layout)
+
+    def upload_vertex_json(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Vertex AI Service Account JSON", "", "JSON Files (*.json)")
+        if file_path:
+            self.service_account_file = file_path
+            self.lbl_vertex_status.setText(f"Selected: {os.path.basename(file_path)}")
+            self.lbl_vertex_status.setStyleSheet("color: #28a745; font-weight: bold;")
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(file_path)
+            QMessageBox.information(self, "Success", f"Service Account updated to:\n{file_path}")
 
     def on_rag_link_clicked(self, url):
         link = url.toString()
@@ -776,7 +830,7 @@ class MainWindow(QMainWindow):
         self.lbl_ext_status.setText("Status: Processing Questions with Gemini Context Stuffing...")
         self.ext_output.clear()
         
-        self.ext_runner = RetrievalRunner(self.latest_output_folder, questions, api_key)
+        self.ext_runner = RetrievalRunner(self.latest_output_folder, questions, api_key, self.service_account_file)
         self.ext_runner.finished.connect(self.on_ext_finished)
         self.ext_runner.start()
 
@@ -858,7 +912,7 @@ class MainWindow(QMainWindow):
         self.lbl_script_status.setText("Status: Generating Script with Gemini AI...")
         self.script_output.clear()
         
-        self.script_runner = ScriptRunner(self.latest_output_folder, api_key)
+        self.script_runner = ScriptRunner(self.latest_output_folder, api_key, self.service_account_file)
         self.script_runner.finished.connect(self.on_script_finished)
         self.script_runner.start()
 
@@ -897,10 +951,10 @@ class MainWindow(QMainWindow):
         # Scene Count Selection (Dynamic from UI per prompt4.txt)
         count_layout = QHBoxLayout()
         count_layout.addWidget(QLabel("Number of Scenes to Generate:"))
-        self.scene_count_spin = QSpinBox()
-        self.scene_count_spin.setRange(1, 200)
-        self.scene_count_spin.setValue(8) # Default per prompt4.txt
-        count_layout.addWidget(self.scene_count_spin)
+        self.scene_count_input = QLineEdit()
+        self.scene_count_input.setValidator(QIntValidator(1, 200))
+        self.scene_count_input.setPlaceholderText("Enter count (1-200)")
+        count_layout.addWidget(self.scene_count_input)
         scene_layout.addLayout(count_layout)
 
         self.btn_run_scene = QPushButton("Generate Video Scenes")
@@ -933,13 +987,17 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", "Gemini API Key or service account JSON not found.")
             return
 
-        scene_count = self.scene_count_spin.value()
+        try:
+            val = self.scene_count_input.text().strip()
+            scene_count = int(val) if val else 8
+        except ValueError:
+            scene_count = 8
         
         self.btn_run_scene.setEnabled(False)
         self.lbl_scene_status.setText(f"Status: Generating {scene_count} Scenes with Gemini AI...")
         self.scene_output.clear()
         
-        self.scene_runner = SceneRunner(self.latest_output_folder, api_key, scene_count)
+        self.scene_runner = SceneRunner(self.latest_output_folder, api_key, scene_count, self.service_account_file)
         self.scene_runner.finished.connect(self.on_scene_finished)
         self.scene_runner.start()
 
@@ -1017,7 +1075,7 @@ class MainWindow(QMainWindow):
         self.lbl_prompt_status.setText("Status: Engineering Visual Prompts with Gemini AI...")
         self.prompt_output.clear()
         
-        self.prompt_runner = ImagePromptRunner(self.latest_output_folder, api_key)
+        self.prompt_runner = ImagePromptRunner(self.latest_output_folder, api_key, self.service_account_file)
         self.prompt_runner.finished.connect(self.on_prompt_finished)
         self.prompt_runner.start()
 
@@ -1090,7 +1148,7 @@ class MainWindow(QMainWindow):
         self.lbl_img_status.setText("Status: Generating High-Fidelity Images...")
         self.image_output.clear()
         
-        self.img_runner = ImageGenerationRunner(self.latest_output_folder, api_key)
+        self.img_runner = ImageGenerationRunner(self.latest_output_folder, api_key, self.service_account_file)
         self.img_runner.finished.connect(self.on_image_gen_finished)
         self.img_runner.start()
 
@@ -1145,6 +1203,94 @@ class MainWindow(QMainWindow):
             webbrowser.open(pathlib.Path(os.path.abspath(found_file)).as_uri())
         else:
             QMessageBox.warning(self, "Error", f"Audit file 'rag_audit.html' not found.\nChecked in: {', '.join(search_dirs)}")
+
+    def setup_tab11(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        group_config = QGroupBox("Project Selection")
+        config_layout = QHBoxLayout()
+        self.edit_video_project = QLineEdit()
+        self.edit_video_project.setPlaceholderText("Select project root folder (e.g. results/project_name)...")
+        self.btn_browse_video = QPushButton("Browse Project")
+        self.btn_browse_video.clicked.connect(self.browse_video_project)
+        config_layout.addWidget(self.edit_video_project)
+        config_layout.addWidget(self.btn_browse_video)
+        group_config.setLayout(config_layout)
+        layout.addWidget(group_config)
+
+        group_video = QGroupBox("Video Orchestration & Veo 3.1 Render")
+        video_layout = QVBoxLayout()
+        
+        self.btn_run_video = QPushButton("Generate Final Video (180s)")
+        self.btn_run_video.clicked.connect(self.run_video_gen)
+        video_layout.addWidget(self.btn_run_video)
+        
+        self.video_output = QTextEdit()
+        self.video_output.setReadOnly(True)
+        self.video_output.setPlaceholderText("Video timeline and Veo status will appear here...")
+        video_layout.addWidget(self.video_output)
+        
+        group_video.setLayout(video_layout)
+        layout.addWidget(group_video)
+        
+        self.lbl_video_status = QLabel("Status: Idle")
+        self.lbl_video_status.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_video_status)
+        
+        layout.setStretch(1, 1)
+        self.tab11.setLayout(layout)
+
+    def browse_video_project(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Project Root Folder")
+        if folder:
+            self.edit_video_project.setText(folder)
+
+    def run_video_gen(self):
+        manual_path = self.edit_video_project.text().strip()
+        
+        if manual_path:
+            project_root = manual_path
+        elif self.latest_output_folder:
+            # If we just ran Step 10, latest_output_folder is project/section_XX
+            # We need the parent project/ folder
+            project_root = os.path.dirname(self.latest_output_folder)
+        else:
+            QMessageBox.warning(self, "Warning", "Please select a Project Folder or run Step 10 first.")
+            return
+
+        if not os.path.exists(os.path.join(project_root, "sequence.json")):
+             QMessageBox.critical(self, "Error", f"Selected folder is not a valid project (missing sequence.json):\n{project_root}")
+             return
+        
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        has_sa = os.path.exists(self.service_account_file)
+        if not has_sa and (not api_key or "YOUR" in api_key):
+            QMessageBox.critical(self, "Error", "Gemini API Key or service account JSON not found.")
+            return
+
+        self.btn_run_video.setEnabled(False)
+        self.lbl_video_status.setText("Status: Orchestrating Video Timeline...")
+        self.video_output.clear()
+        
+        self.video_runner = VideoGenerationRunner(project_root, api_key, self.service_account_file)
+        self.video_runner.finished.connect(self.on_video_finished)
+        self.video_runner.start()
+
+    @pyqtSlot(bool, str, dict)
+    def on_video_finished(self, success, message, result):
+        self.btn_run_video.setEnabled(True)
+        if success:
+            self.lbl_video_status.setText("Status: Completed")
+            self.lbl_video_status.setStyleSheet("color: #28a745; font-weight: bold;")
+            self.video_output.append(f"SUCCESS: {message}\n")
+            self.video_output.append(json.dumps(result, indent=2, ensure_ascii=False))
+            QMessageBox.information(self, "Success", "Video timeline generated. Veo 3.1 render has been queued.")
+        else:
+            self.lbl_video_status.setText("Status: Failed")
+            self.lbl_video_status.setStyleSheet("color: #dc3545; font-weight: bold;")
+            self.video_output.append(f"ERROR: {message}")
+            QMessageBox.critical(self, "Error", message)
 
     def view_prompt_audit(self):
         search_dirs = []

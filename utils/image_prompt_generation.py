@@ -99,7 +99,7 @@ def generate_prompt_audit_html(prompts_data, output_folder):
         f.write(full_html)
     return audit_path
 
-def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key):
+def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key, service_account_path=None):
     from utils.models_config import get_gemini_client
     if not os.path.exists(scenes_json_path): return None, "scene.json not found."
     rag_text = "[]"
@@ -110,7 +110,7 @@ def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key):
         scenes_data = json.load(f)
     num_scenes = len(scenes_data)
     try:
-        client = get_gemini_client(api_key)
+        client = get_gemini_client(api_key, service_account_path)
         if not client:
             return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
         prompt = f"""TAB 9: PIXEL-PERFECT ONE-SHOT AUDIT LOCK
@@ -136,18 +136,19 @@ You are an elitist Visual Prompt Engineer. DO NOT summarize. Use the provided ON
 }},
 {{
   "scene_id": "scene_01",
-  "scene_name": "Financial Highlights",
-  "subject": "Financial performance comparison",
+  "scene_name": "Financial Performance Comparison",
+  "subject": "Financial performance comparison dashboard",
   "action": "Displaying deposit growth comparison with supporting KPI",
-  "environment": "Minimalist clean corporate space",
+  "environment": "Modern corporate dashboard UI using strict brand palette",
   "art_style": "Ultra-realistic corporate cinematic style",
   "lighting": "soft professional lighting with high clarity",
-  "details_typography": "Bold data labels and premium typography",
-  "additional_polish": "Clean reflections and premium finish",
-  "grounding": "Single-element visualization",
-  "composition": "central bar chart with side KPI card",
+  "details_typography": "Bold high contrast typography with minimal labels",
+  "additional_polish": "Premium UI design with clean structured layout",
+  "grounding": "Accurate proportional representation with no extra elements",
+  "composition": "clean comparison bar chart with supporting KPI layout",
+  "chart_reason": "comparison + single_metric",
   "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
-  "ai_prompt": "Ultra-realistic corporate financial visualization, central comparison bar chart showing Total Deposits with FY25 value 27,14,715 Crore (Page 10) and FY24 value 23,79,786 Crore (Page 10), clear upward growth visualization with labeled bars, strong emphasis on comparison, alongside KPI card displaying Profit After Tax 67,347 Crore (Page 10) in bold typography, minimal labels 'Deposits' and 'PAT', clean structured layout, high contrast readability, premium UI styling, exact logo from reference-pic/download.jpg applied as fixed UI overlay at top-right corner (4% width), --no missing values, incorrect numbers, rounded values, fake data, clutter, distortion",
+  "ai_prompt": "Ultra-realistic corporate financial dashboard, clean comparison bar chart showing Total Deposits with FY25 value 27,14,715 Crore (Page 10) and FY24 value 23,79,786 Crore (Page 10), bars accurately scaled to reflect true proportional difference, clear labeled bars with minimal text 'Deposits', alongside a single KPI card displaying Profit After Tax 67,347 Crore (Page 10) in bold high contrast typography, no additional metrics, no extra panels, clean structured layout, premium UI styling, consistent brand palette, exact logo from reference-pic/download.jpg applied as clear overlay at top-right corner (35% width, 2% margin), --no missing values, incorrect numbers, rounded values, fake data, extra charts, clutter, distortion, wrong proportions, multiple panels",
   "context_trace": [
     {{
       "value": "27,14,715 Crore",
@@ -172,17 +173,18 @@ You are an elitist Visual Prompt Engineer. DO NOT summarize. Use the provided ON
 {{
   "scene_id": "scene_02",
   "scene_name": "Shareholder Returns",
-  "subject": "Shareholder metrics",
-  "action": "Displaying EPS and dividend values as KPI cards",
-  "environment": "Minimalist clean corporate space",
+  "subject": "Shareholder metrics comparison",
+  "action": "Comparing EPS and Dividend values",
+  "environment": "Minimal corporate UI dashboard",
   "art_style": "Ultra-realistic corporate cinematic style",
   "lighting": "clean soft lighting",
   "details_typography": "Bold high contrast typography",
-  "additional_polish": "Premium UI design",
-  "grounding": "Single-element visualization",
-  "composition": "balanced dual KPI layout",
+  "additional_polish": "Premium UI design with minimal layout",
+  "grounding": "Accurate proportional comparison with no extra elements",
+  "composition": "clean vertical comparison bar chart layout",
+  "chart_reason": "comparison",
   "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
-  "ai_prompt": "Clean corporate visualization with two prominent KPI cards, one showing Earnings Per Share 88.3 (Page 10) and the other showing Dividend Per Share 22.0 (Page 10), both values in bold high contrast typography, minimal labels 'EPS' and 'Dividend', structured side-by-side layout, premium UI design, consistent brand palette, exact logo from reference-pic/download.jpg applied as fixed UI overlay at top-right corner (4% width), --no missing values, incorrect numbers, rounded values, fake data, clutter, distortion",
+  "ai_prompt": "Minimal corporate visualization using clean vertical comparison bar chart with two values, Earnings Per Share 88.3 (Page 10) and Dividend Per Share 22.0 (Page 10), arranged in ASCENDING ORDER (lowest value on left, highest value on right), vertical bars accurately representing proportional difference between values, minimal labels 'EPS' and 'Dividend' at base of bars, no additional KPIs, no extra charts, no dashboard panels, clean structured layout, high contrast readability, premium UI design, consistent brand palette, exact logo from reference-pic/download.jpg applied as clear overlay at top-right corner (35% width, 2% margin), --no horizontal bars, missing values, incorrect numbers, rounded values, fake data, clutter, distortion, extra charts, wrong proportions, dashboard panels",
   "context_trace": [
     {{
       "value": "88.3",
@@ -216,30 +218,47 @@ You are an elitist Visual Prompt Engineer. DO NOT summarize. Use the provided ON
 ]
 
 
+=== COMPOSITION SELECTION & DATA VISUALIZATION LOGIC ===
+You must dynamically determine the correct composition and ensure strict data accuracy.
+
+1. COMPOSITION SELECTION LOGIC (MANDATORY — DYNAMIC)
+   Do NOT hardcode composition. Determine: "composition": "<auto_selected_based_on_data>"
+   * COMPARISON DATA (two or more numeric values) → "clean vertical comparison bar chart layout"
+   * QUALITATIVE DATA (names, milestones, events) → "single premium highlight card layout"
+   * DISTRIBUTION / SHARE (parts of a whole, %) → "clean centered pie chart layout" OR "minimal donut chart layout"
+   * TREND / TIME SERIES (growth over time) → "minimal line chart layout"
+   * SINGLE METRIC (only one value) → "single KPI highlight layout"
+   * FAILSAFE: "single premium highlight card layout"
+
+2. DATA VISUALIZATION ACCURACY RULE (STRICT — NON-NEGOTIABLE)
+   * STRICT DATA USAGE: Use ONLY values provided in input. Do NOT generate extra metrics or infer missing ones.
+   * PROPORTIONAL ACCURACY (CRITICAL): Chart visuals MUST match exact values. (e.g., 14.6% segment must look like 14.6%).
+   * VERTICAL ORDERING RULE: Vertical bar charts MUST represent values in ASCENDING order from left to right (lowest value on the left, highest value on the right).
+   * SINGLE METRIC RULE: If only ONE value is provided, show ONLY ONE visualization.
+   * CLEAN VISUALIZATION: No dashboards, no multiple panels, no extra UI elements.
+   * LABELING RULE: Show exact numeric value (e.g. 14.6%) and minimal label.
+   * TEXT OVERFLOW PREVENTION (STRICT): Ensure all text labels have adequate internal padding within their container cards/boxes. No text should touch or cross the boundaries of its container.
+   * CHART SIMPLICITY: Pie/Donut = EXACTLY 2 segments (value + remainder). Bar/Line = ONLY required bars/points.
+   * FAILURE PREVENTION: If data is insufficient or unclear, do NOT generate chart. Fallback: "single KPI highlight layout".
+
+3. STAGE 9 HARD RULES
+   1. SCENE COUNT RULE (N+2): You MUST generate exactly N+2 prompts where N is the number of input scenes. The first must be 'logo_start' and the last must be 'logo_end'.
+   2. PROACTIVE NUMERIC INJECTION: You MUST physically extract exact historical/financial numbers from the STRUCTURED CONTEXT and forcefully inject them into the 'ai_prompt' string for EVERY standard scene. NEVER use phrases like "placeholder value" or "dummy data".
+   3. NUMERIC VALIDATION (ZERO-TOLERANCE): ALL numeric values MUST be validated ONLY against the STRUCTURED CONTEXT.
+   4. EXACT OUTPUT STRUCTURE: Every scene object MUST have: scene_id, scene_name, subject, action, environment, art_style, lighting, details_typography, additional_polish, grounding, composition, branding_instruction, ai_prompt, context_trace, and "chart_reason" (comparison | distribution | trend | single_metric | none).
+   5. AI PROMPT ALIGNMENT: You MUST reflect the selected composition in ai_prompt using correct terminology (bar chart -> "bar chart", "comparison", "bars"; pie chart -> "pie chart", "segments"; etc).
+   6. AI PROMPT INLINE PAGE TAGS (MANDATORY): You MUST rigidly format ALL numbers in your ai_prompt string to include their exact reference page physically inside the string. IMMEDIATELY AFTER any number or financial value, you MUST append "(Page X)". Example: If the number is 88.3, you MUST write "88.3 (Page 10)". FAILURE TO INCLUDE "(Page X)" AFTER A NUMBER IS A ZERO-TOLERANCE VIOLATION.
+   7. CRITIC AGENT (MANDATORY VALIDATION LOOP): AFTER generating each scene "ai_prompt", you MUST cross-check all factual values (numbers, percentages, dates) ONLY against the STRUCTURED CONTEXT. Any value missing in the context, having an incorrect page reference, or being hallucinated must be rejected and fixed. Every number MUST have a mapped object in "context_trace"!
+   8. BRAND COLOR PALETTE & LOGO VISIBILITY: Use the provided Color Palette. The Logo Overlay is 4% width with 2% top-right margins and is a flat 2D element.
+
 === CURRENT TASK ===
-INPUT SCENES:
+INPUT SCENES (N):
 {json.dumps(scenes_data, indent=2)}
 
 STRUCTURED CONTEXT (ONLY TRUTH SOURCE):
 {rag_text}
 
-=== STAGE 9 HARD RULES ===
-1. SCENE COUNT RULE (N+2): You MUST generate exactly N+2 prompts where N is the number of input scenes. The first must be 'logo_start' and the last must be 'logo_end'.
-2. PROACTIVE NUMERIC INJECTION: You MUST physically extract exact historical/financial numbers from the STRUCTURED CONTEXT and forcefully inject them into the 'ai_prompt' string for EVERY standard scene. NEVER use phrases like "placeholder value" or "dummy data". If a scene mentions "Profit After Tax" or any KPI, you MUST fetch the actual real value (e.g. 67,347 Crore) from the STRUCTURED CONTEXT and inject it!
-3. NUMERIC VALIDATION (ZERO-TOLERANCE FOR PLACEHOLDERS): ALL numeric values MUST be validated ONLY against the STRUCTURED CONTEXT. DO NOT write "placeholder value". DO NOT infer. DO NOT write generic descriptions. If you mention a metric, you MUST state its exact numerical value from the context!
-4. EXACT OUTPUT STRUCTURE: Every scene object MUST have exactly these keys: scene_id, scene_name, subject, action, environment, art_style, lighting, details_typography, additional_polish, grounding, composition, branding_instruction, ai_prompt, and context_trace.
-5. AI PROMPT INLINE PAGE TAGS (MANDATORY): You MUST rigidly format ALL numbers in your ai_prompt string to include their exact reference page physically inside the string. IMMEDIATELY AFTER any number or financial value, you MUST append "(Page X)". Example: If the number is 88.3, you MUST write "88.3 (Page 10)". FAILURE TO INCLUDE "(Page X)" AFTER A NUMBER IS A ZERO-TOLERANCE VIOLATION.
-6. CRITIC AGENT (MANDATORY VALIDATION LOOP): AFTER generating each scene "ai_prompt", you MUST cross-check all factual values (numbers, percentages, dates) ONLY against the STRUCTURED CONTEXT. Any value missing in the context, having an incorrect page reference, or being hallucinated must be rejected and fixed. Every number MUST have a mapped object in "context_trace"!
-7. HIGH-FIDELITY DATA RENDERING: When injecting numbers, dates, or financial metrics, you MUST instruct the AI to render these values as sharp, giant, and highly readable text within the visual (e.g., 'giant bold text 67,347 Crore'). This ensures the image generator prioritizes legible data points.
-8. MINIMALIST DATA ACCURACY (SINGLE-ELEMENT LOCK): You MUST render ONLY ONE focused data card or chart. The environment MUST be a clean, empty corporate room or solid wall. DO NOT draw a dashboard, grid, wall of cards, or secondary highlights. If context has 2 values, show ONE chart with 2 bars. NO FILLER DATA.
-9. BRAND COLOR PALETTE & LOGO VISIBILITY: Use the provided Color Palette. The Logo Overlay is 4% width with 2% top-right margins and is a flat 2D element.
-10. STRICT VISUAL GROUNDING AND OVERRIDE LAYER (MANDATORY):
-    * PRIORITY ORDER: 1. Negative Prompt Rules, 2. ai_prompt Content, 3. Visual Style.
-    * DATA DETECTION: If numeric values are present, render ONLY those values (No extra bars/segments). If NO numeric values, DO NOT generate charts/dashboards; render minimal abstract corporate background ONLY.
-    * VISUAL STRUCTURE: 1 Value = Single KPI Card. 2+ Values = Simple Bar Chart or KPI Cards. Number of visuals MUST equal number of values.
-    * CONCEPT OVERRIDE: If the scene is conceptual (ESG, Sustainability, Governance) and has NO numbers, IGNORE all "dashboard" or "data" terms. NO charts allowed.
-    * PIE CHART RULE: Allowed ONLY if proportions/percentages are explicitly provided.
-11. OUTPUT FORMAT: STRICT JSON array only.
+   9. OUTPUT FORMAT: STRICT JSON array only.
 """
         from utils.models_config import ACTIVE_TEXT_MODEL
         response = client.models.generate_content(
@@ -287,7 +306,7 @@ def _critic_agent_validate(prompts):
                 scene["ai_prompt"] = full_prompt
     return issues
 
-def process_image_prompt_generation(latest_output_folder, api_key):
+def process_image_prompt_generation(latest_output_folder, api_key, service_account_path=None):
     scenes_path = os.path.join(latest_output_folder, "scene.json")
     if not os.path.exists(scenes_path): return None, "scene.json missing."
     
@@ -301,7 +320,7 @@ def process_image_prompt_generation(latest_output_folder, api_key):
         )
     
     # First pass generation
-    prompts, msg = run_image_prompt_generation(scenes_path, rag_output_path, api_key)
+    prompts, msg = run_image_prompt_generation(scenes_path, rag_output_path, api_key, service_account_path)
     if not prompts: return None, msg
     
     # === CRITIC AGENT VALIDATION PASS ===
@@ -309,7 +328,7 @@ def process_image_prompt_generation(latest_output_folder, api_key):
     
     if issues:
         # Silent validation - no terminal output or log files
-        prompts2, msg2 = run_image_prompt_generation(scenes_path, rag_output_path, api_key)
+        prompts2, msg2 = run_image_prompt_generation(scenes_path, rag_output_path, api_key, service_account_path)
         if prompts2:
             issues2 = _critic_agent_validate(prompts2)
             if not issues2:

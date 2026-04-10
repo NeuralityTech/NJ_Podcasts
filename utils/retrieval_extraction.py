@@ -18,9 +18,9 @@ def clean_json_response(text):
         return text[idx1 : idx2 + 1]
     return text
 
-def run_gemini_extraction(all_chunks, questions, api_key):
+def run_gemini_extraction(all_chunks, questions, api_key, service_account_path=None):
     try:
-        client = get_gemini_client(api_key)
+        client = get_gemini_client(api_key, service_account_path)
         if not client:
             return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
         
@@ -130,7 +130,7 @@ FINAL OUTPUT FORMAT (STRICT JSON ONLY):
         return all_final_data, "Success"
     except Exception as e: return None, f"Global Error: {str(e)}"
 
-def process_retrieval_extraction(latest_output_folder, questions, api_key):
+def process_retrieval_extraction(latest_output_folder, questions, api_key, service_account_path=None):
     chunks_path = os.path.join(latest_output_folder, "chunks.json")
     if not os.path.exists(chunks_path): return None, "chunks.json missing."
     
@@ -142,7 +142,7 @@ def process_retrieval_extraction(latest_output_folder, questions, api_key):
         pages_in_context = sorted(list(set([c.get('page', '?') for c in chunks])))
         msg_diag = f"SUCCESS: RAG Context Loaded ({len(chunks)} chunks across {len(pages_in_context)} pages: {', '.join(pages_in_context)})"
         
-        result_json, ai_msg = run_gemini_extraction(chunks, questions, api_key)
+        result_json, ai_msg = run_gemini_extraction(chunks, questions, api_key, service_account_path)
         if not result_json: return None, ai_msg
         
         # Final result path mapping

@@ -113,34 +113,61 @@ def run_post_render_critic(client, img_path, ai_prompt, logo_path):
 # ─────────────────────────────────────────────
 # CORE IMAGE GENERATION
 # ─────────────────────────────────────────────
-def generate_one_image(client, prompt_text, img_path, logo_path=None, max_retries=2):
+def generate_one_image(client, prompt_text, img_path, logo_path=None, max_retries=3):
+    last_error = "Unknown Error"
+    
     def call_flash_image(prompt_str):
-        response = client.models.generate_content(
-            model=ACTIVE_IMAGE_MODEL,
-            contents=[prompt_str],
-            config=types.GenerateContentConfig(response_modalities=["IMAGE"], temperature=1.0)
-        )
-        if response.candidates:
-            for candidate in response.candidates:
-                if candidate.content and candidate.content.parts:
-                    for part in candidate.content.parts:
+        nonlocal last_error
+        try:
+            response = client.models.generate_content(
+                model=ACTIVE_IMAGE_MODEL,
+                contents=[prompt_str],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"], 
+                    temperature=1.0
+                )
+            )
+            
+            if response.candidates:
+                cand = response.candidates[0]
+                if cand.finish_reason == "SAFETY":
+                    last_error = "Blocked by Safety Filters"
+                    return False
+                
+                if cand.content and cand.content.parts:
+                    for part in cand.content.parts:
                         if hasattr(part, 'inline_data') and part.inline_data:
                             data = part.inline_data.data
                             if isinstance(data, str): data = base64.b64decode(data)
                             with open(img_path, "wb") as f: f.write(data)
                             return True
-        return False
+            
+            last_error = "Empty response from AI"
+            return False
+        except Exception as e:
+            last_error = str(e)
+            return False
 
-    for attempt in range(max_retries):
-        try:
-            if call_flash_image(prompt_text): return True
-        except: pass
-    return False
+    import time
+    for attempt in range(10):  # Increased to 10 retries to survive quota resets
+        if call_flash_image(prompt_text): 
+            return True, "Success"
+        
+        # If rate limited, wait longer (Exponential backoff)
+        if "429" in last_error or "RESOURCE_EXHAUSTED" in last_error:
+            wait_time = (attempt + 1) * 15  # Wait 15s, 30s, 45s...
+            print(f"DEBUG: Quota hit (429). Waiting {wait_time}s before retry {attempt+1}/10...")
+            time.sleep(wait_time)
+        else:
+            # Small wait for other errors (e.g. 503, connectivity)
+            time.sleep(5)
+    
+    return False, last_error
 
 # ─────────────────────────────────────────────
 # MAIN RUNNER
 # ─────────────────────────────────────────────
-def run_image_generation(image_prompts_json_path, api_key, section_folder):
+def run_image_generation(image_prompts_json_path, api_key, section_folder, service_account_path=None):
     if not os.path.exists(image_prompts_json_path):
         return None, "image_prompts.json not found."
 
@@ -158,7 +185,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder):
 
     try:
         from utils.models_config import get_gemini_client
-        client = get_gemini_client(api_key)
+        client = get_gemini_client(api_key, service_account_path)
         if not client:
             return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
 
@@ -179,7 +206,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder):
                 continue
 
             try:
-                # SUPER AGGRESSIVE BRAND STRIPPING
+                # SUPER AGGRESSIVE BRAND & JARGON STRIPPING
                 clean_ai_prompt = ai_prompt
                 clean_ai_prompt = re.sub(r'(?i)\s*\(\s*Page\s*\d+\s*\)', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r'(?i),?\s*(?:exact\s+)?logo[^\,]*', '', clean_ai_prompt)
@@ -187,17 +214,30 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder):
                 clean_ai_prompt = re.sub(r'(?i),?\s*brand[^\,]*', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r'(?i),?\s*applied\s+as[^\,]*', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r'(?i),?\s*top-right[^\,]*', '', clean_ai_prompt)
+                # New: Stripping all % width/margin and "ASCENDING ORDER" meta-talk
+                clean_ai_prompt = re.sub(r'(?i),?\s*\d+%\s*(?:width|margin|corner|scaling)[^\,]*', '', clean_ai_prompt)
+                clean_ai_prompt = re.sub(r'(?i)ascending\s+order', '', clean_ai_prompt)
+                clean_ai_prompt = re.sub(r'(?i)direct\s+instruction:?', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r',+', ',', clean_ai_prompt)
                 clean_ai_prompt = clean_ai_prompt.strip().strip(',')
                 
-                # ULTRA-RESTRICTIVE NEGATIVE PROMPT: Eliminating multi-card layouts and grids
-                full_prompt = f"{clean_ai_prompt}. Single standalone focused data visualization. Empty minimalist background. --no wall-of-cards, dashboard-grid, multiple-panels, thumbnails, gallery, collection, frame-grid, icons-wall, mosaic, patterns, clutter, collage, blurry, logo, text-blocks"
+                # STAGE 10: DYNAMIC COMPOSITION REFINEMENT
+                composition_type = p.get("composition", "clean standalone visualization")
                 
-                if generate_one_image(client, full_prompt, img_path):
+                # ENHANCED PROMPT: Forcing the "Single Element Lock", "No Borders", and "Proportional Accuracy"
+                full_prompt = (
+                    f"Direct instruction: Render exactly ONE standalone {composition_type}. "
+                    f"Ensure STRICT PROPORTIONAL ACCURACY and ASCENDING ORDER (lowest on left, highest on right). "
+                    f"{clean_ai_prompt}. Minimalist corporate environment, solid background. "
+                    f"--no text-overflow, text-bleed, cutoff-text, border, frame-box, white-outline, dashboard, wall-of-cards, multiple-panels, thumbnails, gallery, frame-grid, icons-wall, mosaic, clutter, collage, blurry, logo, text-blocks, horizontal-bars, 2%, 4%, 'ASCENDING ORDER'"
+                )
+                
+                success, reason = generate_one_image(client, full_prompt, img_path)
+                if success:
                     if logo_path: overlay_logo_on_image(img_path, logo_path)
                     results.append({"scene": scene_id, "image_path": img_filename})
                 else:
-                    results.append({"scene": scene_id, "image_path": "Generation error."})
+                    results.append({"scene": scene_id, "image_path": f"Error: {reason}"})
             except Exception as e:
                 results.append({"scene": scene_id, "image_path": f"Error: {e}"})
 
@@ -207,9 +247,9 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder):
     except Exception as e:
         return None, str(e)
 
-def process_image_generation(latest_output_folder, api_key):
+def process_image_generation(latest_output_folder, api_key, service_account_path=None):
     prompts_path = os.path.join(latest_output_folder, "image_prompts.json")
-    results, msg = run_image_generation(prompts_path, api_key, latest_output_folder)
+    results, msg = run_image_generation(prompts_path, api_key, latest_output_folder, service_account_path)
     
     # CRITICAL: Save images_manifest.json for the Tab 10 UI to display success
     manifest_path = os.path.join(latest_output_folder, "images_manifest.json")

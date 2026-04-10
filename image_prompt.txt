@@ -159,9 +159,40 @@ GENERATED OUTPUT (FINAL FORMAT):
   "composition": "centered full-frame",
   "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay (35% width, 2% margins)"
 }
-]
+========================================================
+COMPOSITION SELECTION & DATA VISUALIZATION LOGIC (FINAL)
+========================================================
 
+You must dynamically determine the correct composition and ensure strict data accuracy in all visualizations.
 
+---
+COMPOSITION SELECTION LOGIC (MANDATORY — DYNAMIC)
+---
+You must NOT hardcode composition. Instead, always determine:
+"composition": "<auto_selected_based_on_data>"
+
+CHART TYPE DECISION LOGIC:
+1. COMPARISON DATA (two or more numeric values) → "clean vertical comparison bar chart layout"
+2. QUALITATIVE DATA (names, milestones, events) → "single premium highlight card layout"
+3. DISTRIBUTION / SHARE (parts of a whole, %) → "clean centered pie chart layout" OR "minimal donut chart layout"
+4. TREND / TIME SERIES (growth over time) → "minimal line chart layout"
+5. SINGLE METRIC (only one value) → "single KPI highlight layout"
+Failsafe: "single premium highlight card layout"
+
+---
+DATA VISUALIZATION ACCURACY RULE (STRICT — NON-NEGOTIABLE)
+---
+1. STRICT DATA USAGE: Use ONLY values provided in input. Do NOT generate extra metrics or infer missing values.
+2. PROPORTIONAL ACCURACY (CRITICAL): Chart visuals MUST match exact values. (e.g., 14.6% segment must look like 14.6%).
+3. VERTICAL ORDERING RULE: Vertical bar charts MUST represent values in ASCENDING order from left to right (lowest value on the left, highest value on the right).
+4. SINGLE METRIC RULE: If only ONE value is provided, show ONLY ONE visualization.
+5. CLEAN VISUALIZATION: Minimal layout. No dashboards. No multiple panels. No extra UI noise. No border lines or frames.
+6. LABELING: Show exact numeric value (e.g., 14.6%) and minimal label at the base of bars.
+7. TEXT OVERFLOW PREVENTION (STRICT): Ensure all text labels have adequate internal padding within their container cards/boxes. No text should touch or cross the boundaries of its container.
+8. SIMPLICITY: Pie/Donut = EXACTLY 2 segments (value + remainder). Bar/Line = ONLY required data.
+9. SINGLE CARD RULE: For milestones, names, or history, do NOT generate multiple pillars. Combine into ONE single stylized card.
+
+---
 STRICT RULES:
 
 1. SCENE COUNT RULE (N+2):
@@ -318,16 +349,18 @@ THEN:
 NO EXCEPTIONS
 
 ========================================================
-AI PROMPT REQUIREMENT
+AI PROMPT REQUIREMENT (PAGE TAG LOCK)
 ========================================================
 
 Each ai_prompt MUST:
 - follow cinematic corporate visual style
 - include logo instruction
 - include negative prompt constraints
-- include numeric trace inline:
+- include numeric trace inline IMMEDIATELY AFTER any number:
 
-"value (Page X)"
+Format: "value (Page X)"
+
+STRICT RULE: You MUST rigidly format ALL numbers to include their exact reference page physically inside the string. IMMEDIATELY AFTER any number or financial value, you MUST append "(Page X)". FAILURE TO INCLUDE "(Page X)" AFTER A NUMBER IS A ZERO-TOLERANCE VIOLATION.
 
 ========================================================
 HTML AUDIT OUTPUT (SEPARATE FILE)
@@ -370,78 +403,100 @@ OUTPUT STRUCTURE (STRICT JSON ONLY)
 
 [
 {
-"scene_id": "logo_start",
-"subject": "logo only",
-"action": "static display",
-"environment": "minimal branded background using palette",
-"lighting": "soft studio lighting",
-"composition": "centered",
-"branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay (35% width, 2% margins)",
-"ai_prompt": "Centered logo on clean minimal background using strict brand palette, premium finish, sharp and high resolution, no additional elements, exact logo from reference-pic/download.jpg (35% width, 2% margins), --no distortion, no blur, no extra objects"
+  "scene_id": "logo_start",
+  "scene_name": "Brand Identity Overview",
+  "subject": "logo only",
+  "action": "static display",
+  "environment": "minimal branded background using palette",
+  "art_style": "Ultra-realistic corporate cinematic style",
+  "lighting": "soft studio lighting",
+  "details_typography": "None",
+  "additional_polish": "Clean UI alignment and premium finish",
+  "grounding": "Flat structured UI layout",
+  "composition": "centered",
+  "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay (35% width, 2% margins)",
+  "ai_prompt": "Centered logo on clean minimal background using strict brand palette, premium finish, sharp and high resolution, no additional elements, exact logo from reference-pic/download.jpg (35% width, 2% margins), --no distortion, no blur, no extra objects"
 },
 {
-"scene_id": "scene_01",
-"subject": "Financial performance comparison dashboard",
-"action": "Displaying deposit growth comparison with supporting KPI",
-"environment": "Modern corporate dashboard UI using strict brand palette",
-"lighting": "soft professional lighting with high clarity",
-"composition": "central bar chart with side KPI card",
-"branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
-"ai_prompt": "Ultra-realistic corporate financial dashboard, central comparison bar chart showing Total Deposits with FY25 value 27,14,715 Crore (Page 10) and FY24 value 23,79,786 Crore (Page 10), clear upward growth visualization with labeled bars, strong emphasis on comparison, alongside KPI card displaying Profit After Tax 67,347 Crore (Page 10) in bold typography, minimal labels 'Deposits' and 'PAT', clean structured layout, high contrast readability, premium UI styling, exact logo from reference-pic/download.jpg applied as fixed UI overlay at top-right corner (35% width, 2% margin), --no missing values, incorrect numbers, rounded values, fake data, clutter, distortion",
-"context_trace": [
+    "scene_id": "scene_01",
+    "scene_name": "Financial Performance Comparison",
+    "subject": "Financial performance comparison dashboard",
+    "action": "Displaying deposit growth comparison with supporting KPI",
+    "environment": "Modern corporate dashboard UI using strict brand palette",
+    "art_style": "Ultra-realistic corporate cinematic style",
+    "lighting": "soft professional lighting with high clarity",
+    "details_typography": "Bold high contrast typography with minimal labels",
+    "additional_polish": "Premium UI design with clean structured layout",
+    "grounding": "Accurate proportional representation with no extra elements",
+    "composition": "clean comparison bar chart with supporting KPI layout",
+    "chart_reason": "comparison + single_metric",
+    "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
+    "ai_prompt": "Ultra-realistic corporate financial dashboard, clean comparison bar chart showing Total Deposits with FY25 value 27,14,715 Crore (Page 10) and FY24 value 23,79,786 Crore (Page 10), bars accurately scaled to reflect true proportional difference, clear labeled bars with minimal text 'Deposits', alongside a single KPI card displaying Profit After Tax 67,347 Crore (Page 10) in bold high contrast typography, no additional metrics, no extra panels, clean structured layout, premium UI styling, consistent brand palette, exact logo from reference-pic/download.jpg applied as clear overlay at top-right corner (35% width, 2% margin), --no missing values, incorrect numbers, rounded values, fake data, extra charts, clutter, distortion, wrong proportions, multiple panels",
+    "context_trace": [
+      {
+        "value": "27,14,715 Crore",
+        "page": "Page 10",
+        "anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
+        "snippet": "Total Deposits reached 27,14,715 Crore in FY25."
+      },
+      {
+        "value": "23,79,786 Crore",
+        "page": "Page 10",
+        "anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
+        "snippet": "Total Deposits were 23,79,786 Crore in FY24."
+      },
+      {
+        "value": "67,347 Crore",
+        "page": "Page 10",
+        "anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
+        "snippet": "Profit After Tax was 67,347 Crore."
+      }
+    ]
+  },
+  {
+    "scene_id": "scene_02",
+    "scene_name": "Shareholder Returns",
+    "subject": "Shareholder metrics comparison",
+    "action": "Comparing EPS and Dividend values",
+    "environment": "Minimal corporate UI dashboard",
+    "art_style": "Ultra-realistic corporate cinematic style",
+    "lighting": "clean soft lighting",
+    "details_typography": "Bold high contrast typography",
+    "additional_polish": "Premium UI design with minimal layout",
+    "grounding": "Accurate proportional comparison with no extra elements",
+    "composition": "clean comparison bar chart layout",
+    "chart_reason": "comparison",
+    "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
+    "ai_prompt": "Minimal corporate visualization using clean comparison bar chart with two values, Earnings Per Share 88.3 (Page 10) and Dividend Per Share 22.0 (Page 10), bars accurately representing proportional difference between values, minimal labels 'EPS' and 'Dividend', no additional KPIs, no extra charts, no dashboard panels, clean structured layout, high contrast readability, premium UI design, consistent brand palette, exact logo from reference-pic/download.jpg applied as clear overlay at top-right corner (35% width, 2% margin), --no missing values, incorrect numbers, rounded values, fake data, clutter, distortion, extra charts, wrong proportions, dashboard panels",
+    "context_trace": [
+      {
+        "value": "88.3",
+        "page": "Page 10",
+        "anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
+        "snippet": "Earnings Per Share was 88.3."
+      },
+      {
+        "value": "22.0",
+        "page": "Page 10",
+        "anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
+        "snippet": "Dividend Per Share was 22.0."
+      }
+    ]
+  },
 {
-"value": "27,14,715 Crore",
-"page": "Page 10",
-"anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
-"snippet": "Total Deposits reached 27,14,715 Crore in FY25."
-},
-{
-"value": "23,79,786 Crore",
-"page": "Page 10",
-"anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
-"snippet": "Total Deposits were 23,79,786 Crore in FY24."
-},
-{
-"value": "67,347 Crore",
-"page": "Page 10",
-"anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
-"snippet": "Profit After Tax was 67,347 Crore."
-}
-]
-},
-{
-"scene_id": "scene_02",
-"subject": "Shareholder metrics dashboard",
-"action": "Displaying EPS and dividend values as KPI cards",
-"environment": "Minimal corporate UI dashboard",
-"lighting": "clean soft lighting",
-"composition": "balanced dual KPI layout",
-"branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
-"ai_prompt": "Clean corporate dashboard with two prominent KPI cards, one showing Earnings Per Share 88.3 (Page 10) and the other showing Dividend Per Share 22.0 (Page 10), both values in bold high contrast typography, minimal labels 'EPS' and 'Dividend', structured side-by-side layout, premium UI design, consistent brand palette, exact logo from reference-pic/download.jpg applied as fixed UI overlay at top-right corner (35% width, 2% margin), --no missing values, incorrect numbers, rounded values, fake data, clutter, distortion",
-"context_trace": [
-{
-"value": "88.3",
-"page": "Page 10",
-"anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
-"snippet": "Earnings Per Share was 88.3."
-},
-{
-"value": "22.0",
-"page": "Page 10",
-"anchor_id": "https://example.com/static/pdfs/report.pdf#page=10",
-"snippet": "Dividend Per Share was 22.0."
-}
-]
-},
-{
-"scene_id": "logo_end",
-"subject": "logo only",
-"action": "static display",
-"environment": "minimal branded background using palette",
-"lighting": "soft studio lighting",
-"composition": "centered",
-"branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
-"ai_prompt": "Centered logo outro on clean minimal background using strict brand palette, consistent with opening frame, sharp high resolution, premium finish, exact logo from reference-pic/download.jpg, 35% width, 2% margin top-right, --no distortion, no blur, no extra elements"
+  "scene_id": "logo_end",
+  "scene_name": "Brand Identity Close",
+  "subject": "logo only",
+  "action": "static display",
+  "environment": "minimal branded background using palette",
+  "art_style": "Ultra-realistic corporate cinematic style",
+  "lighting": "soft studio lighting",
+  "details_typography": "None",
+  "additional_polish": "Clean UI alignment and premium finish",
+  "grounding": "Flat structured UI layout",
+  "composition": "centered",
+  "branding_instruction": "exact logo from reference-pic/download.jpg applied as fixed UI overlay",
+  "ai_prompt": "Centered logo outro on clean minimal background using strict brand palette, consistent with opening frame, sharp high resolution, premium finish, exact logo from reference-pic/download.jpg, 35% width, 2% margin top-right, --no distortion, no blur, no extra elements"
 }
 ]
 

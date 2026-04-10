@@ -4,7 +4,7 @@ import re
 from google.genai import types
 from utils.models_config import ACTIVE_TEXT_MODEL, get_gemini_client
 
-def run_script_generation(rag_output_path, api_key):
+def run_script_generation(rag_output_path, api_key, service_account_path=None):
     if not os.path.exists(rag_output_path):
         return None, "rag_output.json not found."
 
@@ -14,7 +14,7 @@ def run_script_generation(rag_output_path, api_key):
     rag_text = json.dumps(rag_data, indent=2, ensure_ascii=False)
     
     try:
-        client = get_gemini_client(api_key)
+        client = get_gemini_client(api_key, service_account_path)
         if not client:
             return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
         
@@ -80,12 +80,12 @@ OUTPUT FORMAT (STRICT JSON):
     except Exception as e:
         return {"script": "Mock: Trust, Performance, and a Vision for the Future..."}, f"Gemini Error: {str(e)}"
 
-def process_script_generation(latest_output_folder, api_key):
+def process_script_generation(latest_output_folder, api_key, service_account_path=None):
     from utils import sequencing
     import shutil
     section_path = sequencing.init_new_section()
     rag_output_path = os.path.join(latest_output_folder, "rag_output.json")
-    script_json, msg = run_script_generation(rag_output_path, api_key)
+    script_json, msg = run_script_generation(rag_output_path, api_key, service_account_path)
     if not script_json: return None, msg
 
     json_path = os.path.join(section_path, "script.json")
@@ -99,5 +99,11 @@ def process_script_generation(latest_output_folder, api_key):
     dest_rag = os.path.join(section_path, "rag_output.json")
     if os.path.exists(rag_output_path) and not os.path.exists(dest_rag):
         shutil.copy2(rag_output_path, dest_rag)
+    
+    # NEW: Copy rag_audit.html into new section folder for traceability
+    rag_audit_path = os.path.join(latest_output_folder, "rag_audit.html")
+    dest_audit = os.path.join(section_path, "rag_audit.html")
+    if os.path.exists(rag_audit_path) and not os.path.exists(dest_audit):
+        shutil.copy2(rag_audit_path, dest_audit)
 
     return section_path, msg
