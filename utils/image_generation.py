@@ -151,6 +151,9 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
     with open(image_prompts_json_path, 'r', encoding='utf-8') as f:
         prompts_data = json.load(f)
 
+    if not prompts_data:
+        return None, "image_prompts.json is empty."
+
     results = []
     image_folder = os.path.join(section_folder, "images")
     os.makedirs(image_folder, exist_ok=True)
@@ -170,18 +173,21 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
             img_filename = f"{scene_id}.png"
             img_path = os.path.join(image_folder, img_filename)
 
-            if not ai_prompt: continue
+            if not ai_prompt: 
+                # print(f"DEBUG: Skipping {scene_id} - Empty Prompt")
+                continue
 
             # HYPER-STRICT INTRO/OUTRO LOGIC: MANDATORY WHITE ONLY
             if scene_id in ["logo_start", "logo_end"] and logo_path:
-                # User strict requirement: logo_start and logo_end MUST be WHITE
+                # print(f"DEBUG: Generating static white logo transition for {scene_id}...")
                 bg = Image.new("RGB", (1920, 1080), (255, 255, 255)) 
                 bg.save(img_path)
                 overlay_logo_on_image(img_path, logo_path, centered=True)
-                results.append({"scene": scene_id, "image_path": img_filename})
+                results.append({"scene": scene_id, "image_path": img_filename, "status": "Success"})
                 continue
 
             try:
+                # print(f"DEBUG: Calling AI for scene {scene_id}...")
                 # CLEAN AND REINFORCE PROMPT
                 clean_ai_prompt = ai_prompt
                 clean_ai_prompt = re.sub(r'(?i)\s*\(\s*Page\s*\d+\s*\)', '', clean_ai_prompt)
@@ -191,7 +197,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
                 clean_ai_prompt = re.sub(r',+', ',', clean_ai_prompt)
                 
                 composition_type = p.get("composition", "clean standalone visualization").upper()
-                environment_type = "Solid Clean White background (#FFFFFF)" # HARD PROJECT LOCK: NO OTHER BACKGROUNDS ALLOWED
+                environment_type = p.get("environment", "Solid Clean White background (#FFFFFF)")
                 
                 # FINAL SUPER AGGRESSIVE MANDATORY PROMPT
                 full_prompt = (
@@ -206,12 +212,18 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
                 
                 success, reason = generate_one_image(client, full_prompt, img_path)
                 if success:
+                    # print(f"DEBUG: Scene {scene_id} generated. Applying logo overlay...")
                     if logo_path: overlay_logo_on_image(img_path, logo_path)
-                    results.append({"scene": scene_id, "image_path": img_filename})
+                    results.append({"scene": scene_id, "image_path": img_filename, "status": "Success"})
                 else:
-                    results.append({"scene": scene_id, "image_path": f"Error: {reason}"})
+                    # print(f"ERROR: Scene {scene_id} failed: {reason}")
+                    results.append({"scene": scene_id, "image_path": f"Error: {reason}", "status": "Failed"})
             except Exception as e:
-                results.append({"scene": scene_id, "image_path": f"Error: {e}"})
+                # print(f"ERROR: Scene {scene_id} exception: {e}")
+                results.append({"scene": scene_id, "image_path": f"Error: {e}", "status": "Failed"})
+
+        if not results:
+            return None, "No prompts found to generate. Section might be empty."
 
         sequencing.save_section_sequence(section_folder)
         sequencing.rebuild_global_sequence()
@@ -220,9 +232,16 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
         return None, str(e)
 
 def process_image_generation(latest_output_folder, api_key, service_account_path=None):
+    if not latest_output_folder or not os.path.exists(latest_output_folder):
+        return None, f"Target folder not found: {latest_output_folder}"
+        
     prompts_path = os.path.join(latest_output_folder, "image_prompts.json")
     results, msg = run_image_generation(prompts_path, api_key, latest_output_folder, service_account_path)
-    manifest_path = os.path.join(latest_output_folder, "images_manifest.json")
-    with open(manifest_path, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-    return latest_output_folder, "Success"
+    
+    if results:
+        manifest_path = os.path.join(latest_output_folder, "images_manifest.json")
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        return latest_output_folder, f"Generated {len(results)} image entries."
+    else:
+        return None, msg

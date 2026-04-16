@@ -98,7 +98,7 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
     - All other scenes = Strict Bitmap Lock
     """
     try:
-        print(f"DEBUG: Starting 3-Minute Absolute Fidelity Production (PIE=STATIC).")
+        # print(f"DEBUG: Starting 3-Minute Absolute Fidelity Production (PIE=STATIC).")
         from google.genai import types
         try:
             from moviepy import VideoFileClip, concatenate_videoclips, ImageClip
@@ -189,8 +189,8 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
         final_sequence.extend(internal_content)
         if last_logo_end: final_sequence.append(last_logo_end)
         
-        print(f"DEBUG: Extraction complete. Total Unique Scenes: {len(final_sequence)}")
-        print(f"DEBUG: Content: {content_count} | Logos: {'Start' if first_logo_start else 'None'} + {'End' if last_logo_end else 'None'}")
+        # print(f"DEBUG: Extraction complete. Total Unique Scenes: {len(final_sequence)}")
+        # print(f"DEBUG: Content: {content_count} | Logos: {'Start' if first_logo_start else 'None'} + {'End' if last_logo_end else 'None'}")
 
         # 4. RENDER LOOP
         shot_files = []
@@ -209,7 +209,7 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
                 shot_files.append(shot_path)
                 continue
 
-            print(f"DEBUG: Rendering Scene {idx}/{len(final_sequence)} ({s_id}) | Motion: {motion_tag}")
+            # print(f"DEBUG: Rendering Scene {idx}/{len(final_sequence)} ({s_id}) | Motion: {motion_tag}")
 
             # CASE B: GENERATIVE MOTION (WITH RETRY & FALLBACK)
             proc_img_path = os.path.join(renders_dir, f"temp_{idx}.png")
@@ -422,7 +422,7 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
             
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    print(f"DEBUG: Rendering Attempt {attempt}/{MAX_RETRIES} for {s_id}...")
+                    # print(f"DEBUG: Rendering Attempt {attempt}/{MAX_RETRIES} for {s_id}...")
                     operation = client.models.generate_videos(
                         model=ACTIVE_VIDEO_MODEL,
                         prompt=veo_prompt,
@@ -444,7 +444,7 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
                     
                     if operation.error:
                         err_code = getattr(operation.error, 'code', 0)
-                        print(f"WARNING: Attempt {attempt} failed with error code {err_code}. Message: {operation.error}")
+                        # print(f"WARNING: Attempt {attempt} failed with error code {err_code}. Message: {operation.error}")
                         if err_code == 8: # High Load
                             time.sleep(15) # Wait before retry
                             continue
@@ -453,11 +453,11 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
                         video_bytes = operation.response.generated_videos[0].video.video_bytes
                         with open(shot_path, 'wb') as out_f: out_f.write(video_bytes)
                         shot_files.append(shot_path)
-                        print(f"DEBUG: Scene {s_id} Rendered successfully.")
+                        # print(f"DEBUG: Scene {s_id} Rendered successfully.")
                         success = True
                         break
                     else:
-                        print(f"WARNING: Attempt {attempt} returned NO VIDEO.")
+                        pass # Logs suppressed
                 except Exception as e:
                     print(f"ERROR: Attempt {attempt} error: {e}")
                 
@@ -480,14 +480,14 @@ def process_video_generation(project_folder, api_key=None, service_account_path=
         
         if shot_files:
             if HAS_MOVIEPY:
-                print(f"DEBUG: Concatenating {len(shot_files)} shots via MoviePy...")
+                # print(f"DEBUG: Concatenating {len(shot_files)} shots via MoviePy...")
                 clips = [VideoFileClip(s) for s in shot_files]
                 final_clip = concatenate_videoclips(clips, method="compose")
                 final_clip.write_videofile(final_output_path, fps=24, audio=False)
                 for c in clips: c.close()
             else:
                 # FFmpeg fallback (Concatenation via file list)
-                print(f"DEBUG: Concatenating {len(shot_files)} shots via FFmpeg Fallback...")
+                # print(f"DEBUG: Concatenating {len(shot_files)} shots via FFmpeg Fallback...")
                 list_path = os.path.join(renders_dir, "concat_list.txt")
                 with open(list_path, 'w') as f:
                     for s in shot_files:

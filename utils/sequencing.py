@@ -61,6 +61,7 @@ def normalize_sections():
                 # Update scene IDs in prompts
                 updated_prompts = []
                 for p in prompts:
+                    if not isinstance(p, dict): continue
                     old_sid = p.get("scene_id")
                     if old_sid in scene_map:
                         p["scene_id"] = scene_map[old_sid]
@@ -104,14 +105,14 @@ def ensure_metadata_integrity(section_path):
     new_prompts = []
     seen_ids = set()
     
-    # First, filter existing prompts for duplicates and validity
+    # PRESERVATION LOCK: Keep all engineered prompts (even if images aren't on disk yet)
     for p in prompts:
         sid = p.get("scene_id")
-        if sid and sid in all_files and sid not in seen_ids:
+        if sid and sid not in seen_ids:
             new_prompts.append(p)
             seen_ids.add(sid)
             
-    # Then add missing files
+    # Then add missing files (Growth Only)
     for fid in all_files:
         if fid not in seen_ids:
             # AUTO-REPAIR: Add missing entry

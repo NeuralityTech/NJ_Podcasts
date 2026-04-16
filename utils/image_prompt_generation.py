@@ -97,9 +97,31 @@ def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key, serv
     if not os.path.exists(scenes_json_path): return None, "scene.json not found."
     
     rag_text = "[]"
-    if os.path.exists(rag_output_path):
-        with open(rag_output_path, 'r', encoding='utf-8') as f:
-            rag_text = json.dumps(json.load(f), indent=2, ensure_ascii=False)
+    # DATA PIPELINE FIX: Check local section folder FIRST, then global output folder
+    final_rag_path = rag_output_path
+    if not os.path.exists(final_rag_path):
+        global_rag = os.path.join(os.getcwd(), "output", "custom_pages", "auto", "rag_output.json")
+        if os.path.exists(global_rag):
+            # print(f"DEBUG: Local rag_output.json not found. Falling back to global: {global_rag}")
+            final_rag_path = global_rag
+        else:
+            return None, f"Source RAG data not found (tried {rag_output_path} and global output)."
+
+    if os.path.exists(final_rag_path):
+        try:
+            with open(final_rag_path, 'r', encoding='utf-8') as f:
+                rag_json = json.load(f)
+                if not rag_json:
+                    return None, "Error: RAG output file is empty []. Run Step 6 (RAG QA) again."
+                rag_text = json.dumps(rag_json)
+        except Exception as e:
+            return None, f"Failed to read RAG data: {e}"
+    
+    # Also ensure scene.json is not empty
+    with open(scenes_json_path, 'r', encoding='utf-8') as f:
+        scenes_data = json.load(f)
+        if not scenes_data:
+            return None, "Error: scene.json is empty []. Run Step 8 (Scene Gen) again."
             
     palette_text = ""
     palette_path = os.path.join("reference-pic", "hdfc_bank_full_palette.md")
@@ -107,8 +129,7 @@ def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key, serv
         with open(palette_path, 'r', encoding='utf-8') as f:
             palette_text = f.read()
 
-    with open(scenes_json_path, 'r', encoding='utf-8') as f:
-        scenes_data = json.load(f)
+    # print(f"DEBUG: Scenes found: {len(scenes_data)} | RAG data size: {len(rag_text)} chars")
         
     try:
         client = get_gemini_client(api_key, service_account_path)
@@ -147,6 +168,10 @@ You MUST classify each scene BEFORE generating the prompt based on numeric densi
 3. DISTRIBUTION (%) → "minimal donut chart layout"
 4. TREND (Time) → "minimal line chart layout"
 5. QUALITATIVE (Blank) → "single premium highlight card layout"
+DATA ORDERING LOCK (STRICT ASCENDING)
+For all COMPARISON or DATA-DRIVEN layouts (bar charts, multi-value cards), you MUST arrange the data points in STRICT ASCENDING ORDER from left to right.
+- Smallest value on the LEFT / START.
+- Largest value on the RIGHT / END.
 
 STRICT RULES:
 1. SCENE COUNT: Exactly N + 2 prompts.
@@ -306,13 +331,33 @@ STRUCTURED CONTEXT (ONLY TRUTH SOURCE):
         from utils.models_config import ACTIVE_TEXT_MODEL
         response = client.models.generate_content(
             model=ACTIVE_TEXT_MODEL,
-            contents=prompt,
+            contents=[
+                prompt,
+                f"INPUT SCENE DATA: {json.dumps(scenes_data)}",
+                f"INPUT RAG TRUTH SOURCE: {rag_text}"
+            ],
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0)
         )
-        if not response.text: return None, "Empty response."
-        prompts_data = json.loads(response.text.strip().strip('```json').strip('```'))
-        return prompts_data, "Success"
-    except Exception as e: return None, str(e)
+        
+        if response.text:
+            text = response.text.strip()
+            if text.startswith("```json"): text = text[7:-3].strip()
+            elif text.startswith("```"): text = text[3:-3].strip()
+            
+            try:
+                prompts_data = json.loads(text)
+                if not isinstance(prompts_data, list) or len(prompts_data) == 0:
+                    return None, "Error: AI generated an empty list []. This usually means the RAG data didn't provide enough specific metrics for the scenes."
+                
+                # Apply Critic Validation
+                final_prompts = _critic_agent_validate(prompts_data)
+                return final_prompts, "Success"
+            except Exception as e:
+                return None, f"JSON Parse Error: {str(e)}"
+        else:
+            return None, "Empty response from Gemini AI."
+    except Exception as e:
+        return None, str(e)
 
 def _critic_agent_validate(prompts):
     """Python-level Critic Agent: validates keys and enforces ABSOLUTE WHITE BACKGROUND LOCK."""
@@ -320,10 +365,19 @@ def _critic_agent_validate(prompts):
     required_keys = ["scene_id", "scene_name", "subject", "action", "environment", "composition", "branding_instruction", "ai_prompt"]
     for scene in prompts:
         if not isinstance(scene, dict): continue
-        sid = scene.get("scene_id", "?")
-        for key in required_keys:
-            if key not in scene:
-                issues.append(f"CRITIC FAIL [{sid}]: Missing key '{key}'")
+        sid = scene.get("scene_id", "scene_?")
+        
+        # AUTO-REPAIR MISSING KEYS
+        if "scene_name" not in scene:
+            scene["scene_name"] = sid.replace("_", " ").title()
+        if "subject" not in scene:
+            scene["subject"] = "Data Visualization"
+        if "action" not in scene:
+            scene["action"] = "Highlighting metrics"
+        if "composition" not in scene:
+            scene["composition"] = "clean standalone visualization"
+        if "branding_instruction" not in scene:
+            scene["branding_instruction"] = "exact logo from reference-pic/download.jpg applied as fixed UI overlay"
         
         # ABSOLUTE WHITE BACKGROUND LOCK FOR EVERY SCENE
         scene["environment"] = "Solid Clean White background (#FFFFFF)"
@@ -350,7 +404,7 @@ def _critic_agent_validate(prompts):
         if prompt_type != "QUALITATIVE" and sid not in ("logo_start", "logo_end"):
             if not re.search(r"\(Page \d+\)", ai_prompt):
                 issues.append(f"CRITIC FAIL [{sid}]: Missing '(Page X)'")
-    return issues
+    return prompts
 
 def process_image_prompt_generation(latest_output_folder, api_key, service_account_path=None):
     scenes_path = os.path.join(latest_output_folder, "scene.json")

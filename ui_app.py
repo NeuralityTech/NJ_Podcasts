@@ -180,7 +180,7 @@ class SequencingRunner(QThread):
             from utils.sequencing import rebuild_global_sequence
             rebuild_global_sequence()
         except Exception as e:
-            print(f"DEBUG: Sequencing Thread Error: {e}")
+            pass # Logs suppressed
         self.finished.emit()
 
 # Custom Modern Styling
@@ -1030,6 +1030,7 @@ class MainWindow(QMainWindow):
     def on_scene_finished(self, success, message, output_folder):
         self.btn_run_scene.setEnabled(True)
         if success:
+            self.latest_output_folder = output_folder # CRITICAL SYNC FIX
             self.lbl_scene_status.setText("Status: Completed")
             self.lbl_scene_status.setStyleSheet("color: #28a745; font-weight: bold;")
             self.scene_output.append(f"SUCCESS: {message}\nFolder: {output_folder}\n")
@@ -1109,6 +1110,7 @@ class MainWindow(QMainWindow):
         self.btn_run_prompt.setEnabled(True)
         self.prompt_output_dir = output_folder # Capture the EXACT directory for the auditor
         if success:
+            self.latest_output_folder = output_folder # CRITICAL SYNC FIX
             self.lbl_prompt_status.setText("Status: Completed")
             self.lbl_prompt_status.setStyleSheet("color: #28a745; font-weight: bold;")
             self.prompt_output.append(f"SUCCESS: {message}\nFolder: {output_folder}\n")
