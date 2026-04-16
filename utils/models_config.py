@@ -17,8 +17,8 @@ ACTIVE_TEXT_MODEL = MODELS["rag_engine"]
 ACTIVE_VIDEO_MODEL = MODELS["video_engine"]
 
 # SERVICE ACCOUNT AUTHENTICATION (CENTRAL)
-SERVICE_ACCOUNT_FILE = "neurality-nj-e776c5d11c91.json"
-SERVICE_ACCOUNT_NOTICE = "Service account detected and configured: neurality-nj-e776c5d11c91.json"
+SERVICE_ACCOUNT_FILE = "gen-lang-client-0270986555-ec92ab1a153a.json"
+SERVICE_ACCOUNT_NOTICE = "Service account detected and configured: gen-lang-client-0270986555-ec92ab1a153a.json"
 
 def get_gemini_client(api_key=None, service_account_path=None, location="global"):
     """

@@ -56,7 +56,7 @@ def create_section_sequence(section_folder):
 
 def update_master_sequence(section_folder, project_root="project"):
     """Appends the new section entry into the master sequence.json."""
-    master_path = os.path.join(project_root, "sequence.json")
+    master_path = os.path.join(project_root, "global_sequence.json")
     section_id = os.path.basename(section_folder)
     
     data = {"total_duration": 0, "sections": []}

@@ -20,14 +20,11 @@ def make_logo_transparent_and_cropped(logo):
     logo = logo.convert("RGBA")
     datas = logo.getdata()
     
-    # Corner Color Detection: Sampling all 4 corners and choosing the dominant color
-    # This prevents failure if one corner has a single-pixel border noise.
+    # Corner Color Detection
     corners = [datas[0], datas[logo.width-1], datas[len(datas)-logo.width], datas[len(datas)-1]]
-    # Pick the most frequent corner color
     bg_color = max(set(corners), key=corners.count)
     
     newData = []
-    # High Tolerance (Level 35) to handle both white and container-blue backgrounds
     tol = 35 
     for item in datas:
         is_bg = True
@@ -36,7 +33,6 @@ def make_logo_transparent_and_cropped(logo):
                 is_bg = False
                 break
         
-        # SECONDARY REMOVAL: If it's a very light color (near white > 240), also make it transparent
         if not is_bg and (item[0] > 240 and item[1] > 240 and item[2] > 240):
             is_bg = True
 
@@ -46,7 +42,6 @@ def make_logo_transparent_and_cropped(logo):
             newData.append(item)
     
     logo.putdata(newData)
-    
     bbox = logo.getbbox()
     if bbox:
         logo = logo.crop(bbox)
@@ -62,20 +57,15 @@ def overlay_logo_on_image(img_path, logo_path, centered=False):
         logo = Image.open(logo_path).convert("RGBA")
         logo = make_logo_transparent_and_cropped(logo)
 
-        # High Visibility Standard: 35% width, 2% margins
         frame_w, frame_h = base.size
         logo_w = int(frame_w * 0.35) if frame_w > 0 else 500
         logo_ratio = logo.height / logo.width
         logo_h = int(logo_w * logo_ratio)
         
-        # BICUBIC Resampling: Sharper for high-frequency text (logos) than Lanczos
         logo = logo.resize((logo_w, logo_h), Image.Resampling.BICUBIC)
-
-        # High-power sharpening (Level 2.8) for absolute logo clarity
         sharpener = ImageEnhance.Sharpness(logo)
         logo = sharpener.enhance(2.8)
         
-        # Premium contrast and slight brightness for pop
         enhancer = ImageEnhance.Contrast(logo)
         logo = enhancer.enhance(1.3)
         bright = ImageEnhance.Brightness(logo)
@@ -92,23 +82,12 @@ def overlay_logo_on_image(img_path, logo_path, centered=False):
             pos_x = frame_w - logo_w - margin_x
             pos_y = margin_y
 
-        # Composite with alpha transparency
         base.alpha_composite(logo, (pos_x, pos_y))
-        # Final high-clarity PNG save
         base.convert("RGB").save(img_path, "PNG")
         return True
     except Exception as e: 
         print(f"Logo Overlay Error: {e}")
         return False
-
-# ─────────────────────────────────────────────
-# POST-RENDER CRITIC AGENT
-# ─────────────────────────────────────────────
-def run_post_render_critic(client, img_path, ai_prompt, logo_path):
-    """
-    STRICT CONTENT CRITIC: Only rejects for data mismatch.
-    """
-    return True, [] 
 
 # ─────────────────────────────────────────────
 # CORE IMAGE GENERATION
@@ -149,23 +128,20 @@ def generate_one_image(client, prompt_text, img_path, logo_path=None, max_retrie
             return False
 
     import time
-    for attempt in range(10):  # Increased to 10 retries to survive quota resets
+    for attempt in range(10):
         if call_flash_image(prompt_text): 
             return True, "Success"
         
-        # If rate limited, wait longer (Exponential backoff)
         if "429" in last_error or "RESOURCE_EXHAUSTED" in last_error:
-            wait_time = (attempt + 1) * 15  # Wait 15s, 30s, 45s...
-            print(f"DEBUG: Quota hit (429). Waiting {wait_time}s before retry {attempt+1}/10...")
+            wait_time = (attempt + 1) * 15
             time.sleep(wait_time)
         else:
-            # Small wait for other errors (e.g. 503, connectivity)
             time.sleep(5)
     
     return False, last_error
 
 # ─────────────────────────────────────────────
-# MAIN RUNNER
+# MAIN RUNNER (STAGE 10: IMAGE GENERATOR)
 # ─────────────────────────────────────────────
 def run_image_generation(image_prompts_json_path, api_key, section_folder, service_account_path=None):
     if not os.path.exists(image_prompts_json_path):
@@ -179,7 +155,6 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
     image_folder = os.path.join(section_folder, "images")
     os.makedirs(image_folder, exist_ok=True)
 
-    # Use the latest download.jpg from reference-pic
     logo_path = os.path.join(os.getcwd(), "reference-pic", "download.jpg")
     if not os.path.exists(logo_path): logo_path = None
 
@@ -187,7 +162,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
         from utils.models_config import get_gemini_client
         client = get_gemini_client(api_key, service_account_path)
         if not client:
-            return None, "Error: No Gemini client could be initialized (API Key missing and no Service Account found)."
+            return None, "Error: No Gemini client could be initialized."
 
         for p in prompts_data:
             scene_id = p.get("scene_id", "?")
@@ -197,39 +172,36 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
 
             if not ai_prompt: continue
 
-            # HYPER-STRICT INTRO/OUTRO: SKIP AI ENTIRELY
+            # HYPER-STRICT INTRO/OUTRO LOGIC: MANDATORY WHITE ONLY
             if scene_id in ["logo_start", "logo_end"] and logo_path:
-                white_bg = Image.new("RGB", (1920, 1080), (255, 255, 255))
-                white_bg.save(img_path)
+                # User strict requirement: logo_start and logo_end MUST be WHITE
+                bg = Image.new("RGB", (1920, 1080), (255, 255, 255)) 
+                bg.save(img_path)
                 overlay_logo_on_image(img_path, logo_path, centered=True)
                 results.append({"scene": scene_id, "image_path": img_filename})
                 continue
 
             try:
-                # SUPER AGGRESSIVE BRAND & JARGON STRIPPING
+                # CLEAN AND REINFORCE PROMPT
                 clean_ai_prompt = ai_prompt
                 clean_ai_prompt = re.sub(r'(?i)\s*\(\s*Page\s*\d+\s*\)', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r'(?i),?\s*(?:exact\s+)?logo[^\,]*', '', clean_ai_prompt)
-                clean_ai_prompt = re.sub(r'(?i),?\s*HDFC[^\,]*', '', clean_ai_prompt)
-                clean_ai_prompt = re.sub(r'(?i),?\s*brand[^\,]*', '', clean_ai_prompt)
+                clean_ai_prompt = re.sub(r'(?i),?\s*\d+%\s*(?:width|margin|corner|scaling|padding)[^\,]*', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r'(?i),?\s*applied\s+as[^\,]*', '', clean_ai_prompt)
-                clean_ai_prompt = re.sub(r'(?i),?\s*top-right[^\,]*', '', clean_ai_prompt)
-                # New: Stripping all % width/margin and "ASCENDING ORDER" meta-talk
-                clean_ai_prompt = re.sub(r'(?i),?\s*\d+%\s*(?:width|margin|corner|scaling)[^\,]*', '', clean_ai_prompt)
-                clean_ai_prompt = re.sub(r'(?i)ascending\s+order', '', clean_ai_prompt)
-                clean_ai_prompt = re.sub(r'(?i)direct\s+instruction:?', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r',+', ',', clean_ai_prompt)
-                clean_ai_prompt = clean_ai_prompt.strip().strip(',')
                 
-                # STAGE 10: DYNAMIC COMPOSITION REFINEMENT
-                composition_type = p.get("composition", "clean standalone visualization")
+                composition_type = p.get("composition", "clean standalone visualization").upper()
+                environment_type = "Solid Clean White background (#FFFFFF)" # HARD PROJECT LOCK: NO OTHER BACKGROUNDS ALLOWED
                 
-                # ENHANCED PROMPT: Forcing the "Single Element Lock", "No Borders", and "Proportional Accuracy"
+                # FINAL SUPER AGGRESSIVE MANDATORY PROMPT
                 full_prompt = (
-                    f"Direct instruction: Render exactly ONE standalone {composition_type}. "
-                    f"Ensure STRICT PROPORTIONAL ACCURACY and ASCENDING ORDER (lowest on left, highest on right). "
-                    f"{clean_ai_prompt}. Minimalist corporate environment, solid background. "
-                    f"--no text-overflow, text-bleed, cutoff-text, border, frame-box, white-outline, dashboard, wall-of-cards, multiple-panels, thumbnails, gallery, frame-grid, icons-wall, mosaic, clutter, collage, blurry, logo, text-blocks, horizontal-bars, 2%, 4%, 'ASCENDING ORDER'"
+                    f"Direct instruction: Render exactly ONE standalone horizontal {composition_type} centered in the frame. "
+                    f"MANDATORY REQUIREMENT: Use {environment_type} as the SOLID MONOCHROMATIC BACKGROUND. "
+                    f"ZERO TOLERANCE for any other colors, gradients, or textures. NO GRAY. NO NAVY. "
+                    f"TEXT LOCK: ALL HEADINGS IN UPPERCASE. ALL DATA LABELS MUST BE HORIZONTAL. "
+                    f"LAYOUT: LARGE 15% PADDING MARGIN. NO TEXT TOUCHING EDGES. NO OVERFLOW. "
+                    f"{clean_ai_prompt}. "
+                    f"--no angled-text, diagonal-text, curved-text, text-overflow, text-bleed, bright-colors, gradients, gray, slate, navy, texture, border, frame-box, 2%, 12%, width, margin"
                 )
                 
                 success, reason = generate_one_image(client, full_prompt, img_path)
@@ -250,10 +222,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
 def process_image_generation(latest_output_folder, api_key, service_account_path=None):
     prompts_path = os.path.join(latest_output_folder, "image_prompts.json")
     results, msg = run_image_generation(prompts_path, api_key, latest_output_folder, service_account_path)
-    
-    # CRITICAL: Save images_manifest.json for the Tab 10 UI to display success
     manifest_path = os.path.join(latest_output_folder, "images_manifest.json")
     with open(manifest_path, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-        
     return latest_output_folder, "Success"

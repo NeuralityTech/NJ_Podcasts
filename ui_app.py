@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QFileDialog, QLineEdit, QTextEdit, QMessageBox, QScrollArea, QListWidget, QGroupBox,
     QComboBox, QSpinBox, QStackedWidget
 )
-from PyQt5.QtCore import Qt, pyqtSlot, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSlot, QThread, pyqtSignal, QFileSystemWatcher, QTimer
 from PyQt5.QtGui import QIntValidator
 
 # Import custom utilities
@@ -24,6 +24,7 @@ from utils.scene_generation import process_scene_generation
 from utils.image_prompt_generation import process_image_prompt_generation
 from utils.image_generation import process_image_generation
 from utils.video_generation import process_video_generation
+from utils.sequencing import rebuild_global_sequence
 
 # Preprocessing Runner (QThread for Step 4)
 class PreprocessingRunner(QThread):
@@ -170,6 +171,18 @@ class VideoGenerationRunner(QThread):
         except Exception as e:
             self.finished.emit(False, f"Error: {str(e)}", {})
 
+class SequencingRunner(QThread):
+    """Background thread to handle heavy folder reindexing and sequence rebuilding."""
+    finished = pyqtSignal()
+
+    def run(self):
+        try:
+            from utils.sequencing import rebuild_global_sequence
+            rebuild_global_sequence()
+        except Exception as e:
+            print(f"DEBUG: Sequencing Thread Error: {e}")
+        self.finished.emit()
+
 # Custom Modern Styling
 GLOBAL_STYLE = """
 QMainWindow {
@@ -244,7 +257,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(GLOBAL_STYLE)
         
         # Service Account Configuration
-        self.service_account_file = "neurality-nj-e776c5d11c91.json"
+        self.service_account_file = "gen-lang-client-0270986555-ec92ab1a153a.json"
         if os.path.exists(self.service_account_file):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(self.service_account_file)
 
@@ -256,9 +269,21 @@ class MainWindow(QMainWindow):
         self.total_pages = 0
         self.cleaned_pages_data = [] # For preprocessed text (Step 4)
 
+        # Automatic Sequence Watcher
+        self.project_watcher = QFileSystemWatcher(self)
+        self.project_watcher.directoryChanged.connect(self.on_project_changed)
+        self.project_watcher.fileChanged.connect(self.on_project_changed)
+        
         # UI Initialization
         self.init_ui()
-
+        
+        # Debounced Rebuild Timer (Fixes UI Freeze)
+        self.rebuild_timer = QTimer(self)
+        self.rebuild_timer.setSingleShot(True)
+        self.rebuild_timer.timeout.connect(self.safe_rebuild_sequence)
+        
+        self.setup_project_watchers()
+        
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -1259,8 +1284,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Warning", "Please select a Project Folder or run Step 10 first.")
             return
 
-        if not os.path.exists(os.path.join(project_root, "sequence.json")):
-             QMessageBox.critical(self, "Error", f"Selected folder is not a valid project (missing sequence.json):\n{project_root}")
+        if not os.path.exists(os.path.join(project_root, "global_sequence.json")):
+             QMessageBox.critical(self, "Error", f"Selected folder is not a valid project (missing global_sequence.json):\n{project_root}")
              return
         
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
@@ -1291,6 +1316,42 @@ class MainWindow(QMainWindow):
             self.lbl_video_status.setStyleSheet("color: #dc3545; font-weight: bold;")
             self.video_output.append(f"ERROR: {message}")
             QMessageBox.critical(self, "Error", message)
+
+    def setup_project_watchers(self):
+        """Monitors the project folder tree for ANY changes."""
+        root = os.path.join(os.getcwd(), "project")
+        if not os.path.exists(root): os.makedirs(root, exist_ok=True)
+        
+        # Remove old paths to avoid dupes/errors
+        current_paths = self.project_watcher.directories()
+        if current_paths: self.project_watcher.removePaths(current_paths)
+        
+        # Monitor Root (for additions/deletions of sections)
+        self.project_watcher.addPath(root)
+        
+        # Monitor each section's images folder (for scene changes)
+        sections = [f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))]
+        for s in sections:
+            img_dir = os.path.join(root, s, "images")
+            if os.path.exists(img_dir): self.project_watcher.addPath(img_dir)
+            sec_dir = os.path.join(root, s)
+            self.project_watcher.addPath(sec_dir)
+
+    def on_project_changed(self, path):
+        """Triggered automatically on any file system change. Starts a 2s debounce timer."""
+        self.rebuild_timer.start(2000) 
+
+    def safe_rebuild_sequence(self):
+        """Performs heavy rebuilding in a background thread to keep UI alive."""
+        if hasattr(self, 'seq_runner') and self.seq_runner.isRunning():
+            # If already running, wait for next debounce
+            self.rebuild_timer.start(2000)
+            return
+            
+        self.seq_runner = SequencingRunner()
+        self.seq_runner.finished.connect(lambda: QTimer.singleShot(1000, self.setup_project_watchers))
+        self.seq_runner.start()
+        # print("DEBUG: Sequence Rebuild started in background...")
 
     def view_prompt_audit(self):
         search_dirs = []

@@ -11,171 +11,244 @@ def get_project_root():
 
 def normalize_sections():
     """
-    Scans project/ for section_XX folders.
-    Detects gaps in numbering (e.g. 01, 03, 05).
-    If gaps exist, renames them sequentially (01, 02, 03) and updates their internal sequence.json.
+    HEALING ENGINE: Implements DYNAMIC SECTION & SCENE REINDEXING.
+    - Detects and fixes gaps in section numbering (e.g., 01, 03 -> 01, 02).
+    - Detects and fixes gaps in scene numbering (e.g., scene_01, scene_03 -> scene_01, scene_02).
+    - Updates ALL internal references (image_prompts.json, sequence.json).
     """
     root = get_project_root()
     
-    # 1. Scan and Extract
-    existing = sorted([f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))])
-    if not existing:
-        return
+    # 1. SCAN AND HEAL SECTIONS
+    existing_sections = sorted([f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))])
     
-    # 2. Extract numeric indices to check for gaps
-    indices = []
-    for f in existing:
-        try:
-            indices.append(int(f.split("_")[1]))
-        except (ValueError, IndexError):
+    for i, old_section_name in enumerate(existing_sections, 1):
+        new_section_name = f"section_{i:02d}"
+        old_section_path = os.path.join(root, old_section_name)
+        new_section_path = os.path.join(root, new_section_name)
+        
+        # Rename section folder if needed
+        if old_section_name != new_section_name:
+            shutil.move(old_section_path, new_section_path)
+        
+        # 2. SCAN AND HEAL SCENES WITHIN SECTION
+        images_dir = os.path.join(new_section_path, "images")
+        if not os.path.exists(images_dir):
+            os.makedirs(images_dir, exist_ok=True)
             continue
-    
-    indices.sort()
-    
-    # Check if continuous (1, 2, 3...)
-    is_continuous = all(indices[i] == i + 1 for i in range(len(indices)))
-    
-    if is_continuous:
-        return # Everything is fine
-    
-    # 3. Trigger Full Reindexing (Controlled Rename)
-    # We must rename them one by one to avoid collisions or data loss.
-    # Approach: Rename to a temp name first if needed, but since we are always moving "down" (e.g. 03 -> 02), 
-    # we just need to ensure we don't overwrite. Indices are sorted, so we can process them sequentially.
-    
-    for i, old_name in enumerate(existing, 1):
-        new_name = f"section_{i:02d}"
-        if old_name == new_name:
-            continue
+            
+        all_images = sorted([f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
         
-        old_path = os.path.join(root, old_name)
-        new_path = os.path.join(root, new_name)
+        # Identify scenes (excluding anchors like logos)
+        scene_files = [f for f in all_images if f.startswith("scene_")]
+        logo_files = [f for f in all_images if f.startswith("logo_")]
         
-        # Rename the folder
-        shutil.move(old_path, new_path)
-        
-        # 4. Internal Path Update (only sequence.json)
-        # Immutability rule: ONLY sequence.json is editable
-        seq_json_path = os.path.join(new_path, "sequence.json")
-        if os.path.exists(seq_json_path):
+        # Reindex scenes to be continuous
+        scene_map = {} # Old name -> New name
+        for j, old_scene_name in enumerate(scene_files, 1):
+            ext = os.path.splitext(old_scene_name)[1]
+            new_scene_name = f"scene_{j:02d}{ext}"
+            if old_scene_name != new_scene_name:
+                shutil.move(os.path.join(images_dir, old_scene_name), os.path.join(images_dir, new_scene_name))
+            scene_map[os.path.splitext(old_scene_name)[0]] = os.path.splitext(new_scene_name)[0]
+
+        # 3. UPDATE INTERNAL JSON REFERENCES
+        prompts_path = os.path.join(new_section_path, "image_prompts.json")
+        if os.path.exists(prompts_path):
             try:
-                with open(seq_json_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                with open(prompts_path, 'r', encoding='utf-8') as f:
+                    prompts = json.load(f)
                 
-                data["section_id"] = new_name
-                # Update image paths
-                for img_data in data.get("images", []):
-                    # Old path: old_section/images/img.png -> New path: new_section/images/img.png
-                    if "path" in img_data:
-                        parts = img_data["path"].split("/")
-                        if len(parts) >= 3:
-                            parts[0] = new_name
-                            img_data["path"] = "/".join(parts)
+                # Update scene IDs in prompts
+                updated_prompts = []
+                for p in prompts:
+                    old_sid = p.get("scene_id")
+                    if old_sid in scene_map:
+                        p["scene_id"] = scene_map[old_sid]
+                    updated_prompts.append(p)
                 
-                with open(seq_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-            except Exception as e:
-                print(f"Error updating sequence.json in {new_name}: {e}")
+                with open(prompts_path, 'w', encoding='utf-8') as f:
+                    json.dump(updated_prompts, f, indent=2, ensure_ascii=False)
+            except: pass
+
+        # Regenerate section-level sequence.json (Complete Rebuild)
+        save_section_sequence(new_section_path)
+        
+        # 4. PERMANENT FIX: METADATA INTEGRITY GUARD
+        # Auto-create missing JSON entries if images exist on disk
+        ensure_metadata_integrity(new_section_path)
+
+def ensure_metadata_integrity(section_path):
+    """
+    PERMANENT SOLUTION: Synchronizes image_prompts.json with the physical images folder.
+    Ensures that every file in images/ has a corresponding entry in the JSON.
+    """
+    images_dir = os.path.join(section_path, "images")
+    prompts_path = os.path.join(section_path, "image_prompts.json")
+    if not os.path.exists(images_dir): return
+    
+    # 1. Gather files from disk
+    all_files = [os.path.splitext(f)[0] for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    
+    # 2. Read existing prompts
+    prompts = []
+    if os.path.exists(prompts_path):
+        try:
+            with open(prompts_path, 'r', encoding='utf-8') as f:
+                prompts = json.load(f)
+        except: prompts = [] # If corrupted/truncated, start clean from disk
+
+    existing_ids = {p.get("scene_id") for p in prompts if p.get("scene_id")}
+    
+    # 3. Audit and Auto-fill
+    changed = False
+    new_prompts = []
+    seen_ids = set()
+    
+    # First, filter existing prompts for duplicates and validity
+    for p in prompts:
+        sid = p.get("scene_id")
+        if sid and sid in all_files and sid not in seen_ids:
+            new_prompts.append(p)
+            seen_ids.add(sid)
+            
+    # Then add missing files
+    for fid in all_files:
+        if fid not in seen_ids:
+            # AUTO-REPAIR: Add missing entry
+            p_type = "LOGO" if "logo" in fid else "QUALITATIVE"
+            new_entry = {
+                "scene_id": fid,
+                "scene_name": fid.replace("_", " ").title(),
+                "prompt_type": p_type,
+                "ai_prompt": f"Professional corporate visual for {fid}, high resolution, consistent style."
+            }
+            new_prompts.append(new_entry)
+            seen_ids.add(fid)
+            changed = True
+            
+    # Check if we removed any duplicates
+    if len(new_prompts) != len(prompts):
+        changed = True
+
+    # 4. Atomic Save (Prevents Truncation during crash)
+    if changed or not os.path.exists(prompts_path):
+        temp_path = prompts_path + ".tmp"
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(new_prompts, f, indent=2, ensure_ascii=False)
+        os.replace(temp_path, prompts_path)
 
 def get_next_section_folder():
-    """Finds the highest index N and returns section_(N+1)."""
+    """Finds the next logical index (N+1) after healing."""
+    normalize_sections() # Ensure current state is clean
     root = get_project_root()
     existing = sorted([f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))])
-    
-    if not existing:
-        return os.path.join(root, "section_01")
-    
-    last_section = existing[-1]
-    last_num = int(last_section.split("_")[1])
-    next_num = last_num + 1
+    next_num = len(existing) + 1
     return os.path.join(root, f"section_{next_num:02d}")
+
+def save_section_sequence(section_path):
+    """Generates a clean sequence.json for the section."""
+    images_dir = os.path.join(section_path, "images")
+    if not os.path.exists(images_dir): return None
+    
+    image_files = sorted([f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+    section_id = os.path.basename(section_path)
+    
+    sequence_data = {"section_id": section_id, "images": []}
+    for i, img in enumerate(image_files, 1):
+        sequence_data["images"].append({
+            "path": f"{section_id}/images/{img}",
+            "order": i,
+            "duration": 0 # Rebalanced later
+        })
+    
+    output_path = os.path.join(section_path, "sequence.json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(sequence_data, f, indent=2, ensure_ascii=False)
+    return output_path
 
 def init_new_section():
     """
     1. Normalizes existing sections (fixes gaps).
     2. Creates the next sequential section folder.
     """
-    normalize_sections()
-    section_path = get_next_section_folder()
+    section_path = get_next_section_folder() # Already calls normalize_sections()
     os.makedirs(section_path, exist_ok=True)
     os.makedirs(os.path.join(section_path, "images"), exist_ok=True)
     return section_path
 
-def save_section_sequence(section_path):
+def run_sequencing_automation(script_path, scene_path, image_prompts_path, images_source_dir):
     """
-    Generates section-level sequence.json for a NEW section.
-    Initial duration is set to 0 (will be updated globally).
+    Main entry point for the automation.
+    Integrates all steps for a single run.
     """
-    images_dir = os.path.join(section_path, "images")
-    if not os.path.exists(images_dir):
-        return None
-    
-    image_files = sorted([f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+    # 1. Initialize section
+    section_path = init_new_section()
     section_id = os.path.basename(section_path)
     
-    sequence_data = {
-        "section_id": section_id,
-        "images": []
+    # 2. Copy source files (script, scene, prompts)
+    target_script = os.path.join(section_path, "script.txt")
+    target_scene = os.path.join(section_path, "scene.json")
+    target_prompts = os.path.join(section_path, "image_prompts.json")
+    
+    if os.path.exists(script_path): shutil.copy(script_path, target_script)
+    if os.path.exists(scene_path): shutil.copy(scene_path, target_scene)
+    if os.path.exists(image_prompts_path): shutil.copy(image_prompts_path, target_prompts)
+    
+    # 3. Copy images
+    target_images_dir = os.path.join(section_path, "images")
+    if os.path.exists(images_source_dir):
+        for img in os.listdir(images_source_dir):
+            if img.lower().endswith(('.png', '.jpg', '.jpeg')):
+                shutil.copy(os.path.join(images_source_dir, img), os.path.join(target_images_dir, img))
+    
+    # 4. Generate section-level sequence
+    save_section_sequence(section_path)
+    
+    # 5. Global Reconstruction & Timing
+    global_path, global_data = rebuild_global_sequence()
+    
+    # 6. Read back current section sequence for the final output
+    with open(os.path.join(section_path, "sequence.json"), 'r', encoding='utf-8') as f:
+        section_sequence = json.load(f)
+        
+    return {
+        "section_created": section_id,
+        "section_sequence": section_sequence,
+        "global_sequence": global_data
     }
-    
-    for i, img in enumerate(image_files, 1):
-        sequence_data["images"].append({
-            "path": f"{section_id}/images/{img}",
-            "order": i,
-            "duration": 0 # Placeholder
-        })
-    
-    output_path = os.path.join(section_path, "sequence.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(sequence_data, f, indent=2, ensure_ascii=False)
-    
-    return output_path
 
 def apply_dynamic_timing():
-    """
-    Calculates time per image (180 / total_images) and updates ALL sequence.json files.
-    """
+    """Calculates time per image (180 / total_images)."""
     root = get_project_root()
     sections = sorted([f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))])
     
     total_images = 0
     section_data_list = []
     
-    # 1. Count total images
-    for section_id in sections:
-        seq_path = os.path.join(root, section_id, "sequence.json")
+    for sid in sections:
+        seq_path = os.path.join(root, sid, "sequence.json")
         if os.path.exists(seq_path):
             with open(seq_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                count = len(data.get("images", []))
-                total_images += count
+                total_images += len(data.get("images", []))
                 section_data_list.append((seq_path, data))
     
-    if total_images == 0:
-        return 0
+    time_per_image = 180.0 / total_images if total_images > 0 else 0
     
-    # 2. Compute time_per_image
-    time_per_image = 180.0 / total_images
-    
-    # 3. Apply timing to each file
     for seq_path, data in section_data_list:
-        for img_entry in data.get("images", []):
-            img_entry["duration"] = time_per_image
-        
+        for img in data.get("images", []):
+            img["duration"] = time_per_image
         with open(seq_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             
     return time_per_image
 
 def rebuild_global_sequence():
-    """
-    Rebuilds project/sequence.json after timing distribution.
-    """
+    """Triggers healing and rebuilds the global timeline."""
+    normalize_sections() # Step 1: Fix gaps
+    time_per_image = apply_dynamic_timing() # Step 2: Distribution
+    
     root = get_project_root()
-    
-    # Trigger timing calculation
-    time_per_image = apply_dynamic_timing()
-    
     sections = sorted([f for f in os.listdir(root) if f.startswith("section_") and os.path.isdir(os.path.join(root, f))])
     
     global_sequence = {
@@ -184,14 +257,14 @@ def rebuild_global_sequence():
         "sections": []
     }
     
-    for i, section_id in enumerate(sections, 1):
+    for i, sid in enumerate(sections, 1):
         global_sequence["sections"].append({
-            "section_id": section_id,
-            "sequence_file": f"{section_id}/sequence.json",
+            "section_id": sid,
+            "sequence_file": f"{sid}/sequence.json",
             "order": i
         })
         
-    global_path = os.path.join(root, "sequence.json")
+    global_path = os.path.join(root, "global_sequence.json")
     with open(global_path, "w", encoding="utf-8") as f:
         json.dump(global_sequence, f, indent=2, ensure_ascii=False)
         
