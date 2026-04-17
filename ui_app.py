@@ -180,7 +180,7 @@ class SequencingRunner(QThread):
             from utils.sequencing import rebuild_global_sequence
             rebuild_global_sequence()
         except Exception as e:
-            pass # Logs suppressed
+            print(f"DEBUG: Sequencing Thread Error: {e}")
         self.finished.emit()
 
 # Custom Modern Styling

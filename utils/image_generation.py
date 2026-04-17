@@ -174,12 +174,12 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
             img_path = os.path.join(image_folder, img_filename)
 
             if not ai_prompt: 
-                # print(f"DEBUG: Skipping {scene_id} - Empty Prompt")
+                print(f"DEBUG: Skipping {scene_id} - Empty Prompt")
                 continue
 
             # HYPER-STRICT INTRO/OUTRO LOGIC: MANDATORY WHITE ONLY
             if scene_id in ["logo_start", "logo_end"] and logo_path:
-                # print(f"DEBUG: Generating static white logo transition for {scene_id}...")
+                print(f"DEBUG: Generating static white logo transition for {scene_id}...")
                 bg = Image.new("RGB", (1920, 1080), (255, 255, 255)) 
                 bg.save(img_path)
                 overlay_logo_on_image(img_path, logo_path, centered=True)
@@ -187,7 +187,7 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
                 continue
 
             try:
-                # print(f"DEBUG: Calling AI for scene {scene_id}...")
+                print(f"DEBUG: Calling AI for scene {scene_id}...")
                 # CLEAN AND REINFORCE PROMPT
                 clean_ai_prompt = ai_prompt
                 clean_ai_prompt = re.sub(r'(?i)\s*\(\s*Page\s*\d+\s*\)', '', clean_ai_prompt)
@@ -196,30 +196,42 @@ def run_image_generation(image_prompts_json_path, api_key, section_folder, servi
                 clean_ai_prompt = re.sub(r'(?i),?\s*applied\s+as[^\,]*', '', clean_ai_prompt)
                 clean_ai_prompt = re.sub(r',+', ',', clean_ai_prompt)
                 
+                # HYPER-STRICT MANDATORY OVERRIDE
+                environment_type = "Solid Clean White background (#FFFFFF)"
                 composition_type = p.get("composition", "clean standalone visualization").upper()
-                environment_type = p.get("environment", "Solid Clean White background (#FFFFFF)")
                 
+                # MATHEMATICAL PROPORTION INJECTION (Fixes 50/50 AI Bias)
+                if "DONUT" in composition_type or "PIE" in composition_type:
+                    percentages = re.findall(r'(\d+)\s*%', clean_ai_prompt)
+                    if percentages:
+                        v1 = int(percentages[0])
+                        if v1 > 90:
+                            clean_ai_prompt += f" MANDATORY: The main segment ({v1}%) MUST occupy 350 degrees of the circle. The other segment MUST be a tiny 10-degree sliver at the top."
+                        elif v1 < 10:
+                            clean_ai_prompt += f" MANDATORY: The main segment MUST occupy 350 degrees of the circle. The small segment ({v1}%) MUST be a tiny 10-degree sliver at the top."
+
                 # FINAL SUPER AGGRESSIVE MANDATORY PROMPT
                 full_prompt = (
                     f"Direct instruction: Render exactly ONE standalone horizontal {composition_type} centered in the frame. "
                     f"MANDATORY REQUIREMENT: Use {environment_type} as the SOLID MONOCHROMATIC BACKGROUND. "
-                    f"ZERO TOLERANCE for any other colors, gradients, or textures. NO GRAY. NO NAVY. "
+                    f"PROPORTIONAL ACCURACY: If this is a chart, you MUST render slices according to their true mathematical proportions. "
+                    f"ZERO TOLERANCE for any other colors, gradients, or textures. NO GRAY. NO NAVY. NO BLUE. "
                     f"TEXT LOCK: ALL HEADINGS IN UPPERCASE. ALL DATA LABELS MUST BE HORIZONTAL. "
                     f"LAYOUT: LARGE 15% PADDING MARGIN. NO TEXT TOUCHING EDGES. NO OVERFLOW. "
                     f"{clean_ai_prompt}. "
-                    f"--no angled-text, diagonal-text, curved-text, text-overflow, text-bleed, bright-colors, gradients, gray, slate, navy, texture, border, frame-box, 2%, 12%, width, margin"
+                    f"--no angled-text, diagonal-text, curved-text, text-overflow, text-bleed, bright-colors, gradients, gray, slate, navy, texture, border, frame-box, 2%, 12%, width, margin, blue-background, colorful-background"
                 )
                 
                 success, reason = generate_one_image(client, full_prompt, img_path)
                 if success:
-                    # print(f"DEBUG: Scene {scene_id} generated. Applying logo overlay...")
+                    print(f"DEBUG: Scene {scene_id} generated. Applying logo overlay...")
                     if logo_path: overlay_logo_on_image(img_path, logo_path)
                     results.append({"scene": scene_id, "image_path": img_filename, "status": "Success"})
                 else:
-                    # print(f"ERROR: Scene {scene_id} failed: {reason}")
+                    print(f"ERROR: Scene {scene_id} failed: {reason}")
                     results.append({"scene": scene_id, "image_path": f"Error: {reason}", "status": "Failed"})
             except Exception as e:
-                # print(f"ERROR: Scene {scene_id} exception: {e}")
+                print(f"ERROR: Scene {scene_id} exception: {e}")
                 results.append({"scene": scene_id, "image_path": f"Error: {e}", "status": "Failed"})
 
         if not results:

@@ -102,7 +102,7 @@ def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key, serv
     if not os.path.exists(final_rag_path):
         global_rag = os.path.join(os.getcwd(), "output", "custom_pages", "auto", "rag_output.json")
         if os.path.exists(global_rag):
-            # print(f"DEBUG: Local rag_output.json not found. Falling back to global: {global_rag}")
+            print(f"DEBUG: Local rag_output.json not found. Falling back to global: {global_rag}")
             final_rag_path = global_rag
         else:
             return None, f"Source RAG data not found (tried {rag_output_path} and global output)."
@@ -129,7 +129,7 @@ def run_image_prompt_generation(scenes_json_path, rag_output_path, api_key, serv
         with open(palette_path, 'r', encoding='utf-8') as f:
             palette_text = f.read()
 
-    # print(f"DEBUG: Scenes found: {len(scenes_data)} | RAG data size: {len(rag_text)} chars")
+    print(f"DEBUG: Scenes found: {len(scenes_data)} | RAG data size: {len(rag_text)} chars")
         
     try:
         client = get_gemini_client(api_key, service_account_path)
@@ -168,14 +168,18 @@ You MUST classify each scene BEFORE generating the prompt based on numeric densi
 3. DISTRIBUTION (%) → "minimal donut chart layout"
 4. TREND (Time) → "minimal line chart layout"
 5. QUALITATIVE (Blank) → "single premium highlight card layout"
-DATA ORDERING LOCK (STRICT ASCENDING)
+DATA ORDERING LOCK (STRICT ASCENDING - CRITICAL)
 For all COMPARISON or DATA-DRIVEN layouts (bar charts, multi-value cards), you MUST arrange the data points in STRICT ASCENDING ORDER from left to right.
-- Smallest value on the LEFT / START.
-- Largest value on the RIGHT / END.
+1. SCAN: Find all metrics for the scene in the RAG source.
+2. NORMALIZE: Treat 'K27,14,715' as 2714715. Strip commas and currency symbols for comparison.
+3. SORT: Arrange from SMALLEST numerical value (Left) to LARGEST numerical value (Right).
+4. BUILD: Write the 'ai_prompt' and 'subject' based on this sorted sequence.
+ZERO TOLERANCE for descending or random order.
 
 STRICT RULES:
 1. SCENE COUNT: Exactly N + 2 prompts.
 2. NUMERIC TRACE: Every numeric value MUST include "(Page X)".
+3. RE-CHECK: Read your generated JSON and ensure the numbers in 'ai_prompt' are numerically increasing.
 
 OUTPUT STRUCTURE (STRICT JSON ONLY)
 [
